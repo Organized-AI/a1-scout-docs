@@ -62,6 +62,11 @@ section{padding-block:44px;border-top:1px solid var(--line);display:grid;gap:22p
 .feats{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
 @media (max-width:760px){.steps{grid-template-columns:minmax(0,1fr)}}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:8px;align-content:start;min-width:0}
+.fields-guide{margin:0;display:grid;gap:6px;font-size:.9rem}.fields-guide div{display:grid;grid-template-columns:7.5em 1fr;gap:8px;align-items:center}
+.fields-guide dt{color:var(--muted,#9a9a9a);font:600 .78rem var(--mono)}.fields-guide dd{margin:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0}
+.fields-guide code{font:600 .8rem var(--mono);overflow-wrap:anywhere}
+.copy{font:700 .72rem var(--mono);padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:transparent;color:inherit;cursor:pointer}
+.copy:hover{border-color:var(--sun)}.copy:focus-visible{outline:2px solid var(--sun);outline-offset:2px}
 .card .k{font:700 .75rem var(--mono);color:var(--sun);letter-spacing:.08em;text-transform:uppercase}
 .choice{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 @media (max-width:640px){.choice{grid-template-columns:minmax(0,1fr)}}
@@ -146,8 +151,15 @@ footer a{color:var(--muted)}
   <p class="muted" style="max-width:62ch">Scout learns what you build from your Claude and Codex history, then picks the open models and tools that fit. It reads your history on your computer and sends only a summary: tools, languages and libraries, with counts. Your prompts, files and project names stay with you.</p>
   <div class="feats">
     <div class="card"><span class="k">Claude app</span><h3>Add to Claude</h3><p class="muted">Download, then double-click the file. Claude opens it and shows checkboxes for Claude and Codex history. Then ask Claude: "connect me to A1 Scout".</p><a class="pill sun" id="dl-mcpb" href="/download/a1-scout.mcpb" style="justify-self:start">Download for Claude</a></div>
-    <div class="card"><span class="k">Codex app</span><h3>Add to Codex</h3><p class="muted">In Codex, open Plugins, add the marketplace <code>Organized-AI/a1-scout-docs</code>, and install A1 Scout. Then ask Codex: "connect me to A1 Scout".</p><button class="pill" type="button" data-copy="Organized-AI/a1-scout-docs" style="justify-self:start;cursor:pointer">Copy marketplace name</button></div>
-    <div class="card"><span class="k">Claude Code</span><h3>Install the plugin</h3><p class="muted">In Claude Code, type these two lines. It syncs by itself after each session.</p><code style="font:500 .78rem var(--mono);overflow-wrap:anywhere">/plugin marketplace add Organized-AI/a1-scout-docs<br>/plugin install a1-scout@organized-ai</code></div>
+    <div class="card"><span class="k">Codex app</span><h3>Add to Codex</h3><p class="muted">In Codex, open Plugins and choose Add plugin marketplace. Fill in the form like this:</p>
+      <dl class="fields-guide">
+        <div><dt>Source</dt><dd><code>Organized-AI/a1-scout-docs</code><button class="copy" type="button" data-copy="Organized-AI/a1-scout-docs" data-ev="connect_copy_codex_source">Copy</button></dd></div>
+        <div><dt>Git ref</dt><dd><code>main</code> <span class="muted">(already filled in)</span></dd></div>
+        <div><dt>Sparse paths</dt><dd><span class="muted">Leave empty</span></dd></div>
+      </dl>
+      <p class="muted">Click Add marketplace, install A1 Scout, then ask Codex: "connect me to A1 Scout".</p></div>
+    <div class="card"><span class="k">Claude Code</span><h3>Install the plugin</h3><p class="muted">In Claude Code, type these two lines. It syncs by itself after each session.</p><code style="font:500 .78rem var(--mono);overflow-wrap:anywhere">/plugin marketplace add Organized-AI/a1-scout-docs<br>/plugin install a1-scout@organized-ai</code><button class="copy" type="button" data-copy="/plugin marketplace add Organized-AI/a1-scout-docs
+/plugin install a1-scout@organized-ai" data-ev="connect_copy_claude_code" style="justify-self:start">Copy both lines</button></div>
   </div>
   <p class="muted" style="font-size:.9rem"><a href="/privacy/">Exactly what is shared</a> · Open source on <a href="https://github.com/Organized-AI/a1-scout-docs/tree/main/connect" rel="noopener">GitHub</a></p>
 </section>
@@ -205,8 +217,11 @@ footer a{color:var(--muted)}
   }
 
   document.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", async () => {
-    try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = "Copied"; } catch { b.textContent = b.dataset.copy; }
-    ev("connect_copy_marketplace");
+    const label = b.dataset.label || (b.dataset.label = b.textContent);
+    try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = "Copied"; } catch { b.textContent = "Select and copy it"; }
+    if (window.gsap && !reduce) gsap.fromTo(b, {scale:.94}, {scale:1, duration:.35, ease:"back.out(3)"});
+    setTimeout(() => { b.textContent = label; }, 1800);
+    ev(b.dataset.ev || "connect_copy");
   }));
   const dl = document.getElementById("dl-mcpb"); if (dl) dl.addEventListener("click", () => ev("connect_download_claude"));
   const f = document.getElementById("wl"), msg = document.getElementById("wl-msg"), go = document.getElementById("wl-go");

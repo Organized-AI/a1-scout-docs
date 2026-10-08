@@ -8,7 +8,7 @@ Reads Claude Code, Cowork and Codex session logs **on the user's computer** and 
 |---|---|---|
 | Claude Desktop | Double-click `a1-scout.mcpb` (from scout.organizedai.vip/#connect). Checkboxes: Claude history, Codex history, sync automatically, projects to leave out. | Every 30 min while Claude is open, and when it closes |
 | Claude Code / Cowork | `/plugin marketplace add Organized-AI/a1-scout-docs` then `/plugin install a1-scout@organized-ai` | After each session (SessionEnd/Stop hooks, at most every 10 min) + timer |
-| Codex app / CLI | Plugins → add marketplace `Organized-AI/a1-scout-docs` → install A1 Scout | Timer while Codex is open + on close; hooks where Codex runs plugin hooks |
+| Codex app / CLI | Plugins → Add plugin marketplace: Source `Organized-AI/a1-scout-docs`, Git ref `main`, Sparse paths empty → install A1 Scout | Timer while Codex is open + on close; hooks where Codex runs plugin hooks |
 
 Then ask: "connect me to A1 Scout". The person opens the link, checks the code, clicks Connect. No tokens to copy.
 
