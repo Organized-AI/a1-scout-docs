@@ -1,6 +1,6 @@
 {
   "name": "a1-scout",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Connect your Codex and Claude Code sessions to A1 Scout, which matches open models and tools on Hugging Face to the work you actually do. Session logs are read on your computer; only privacy-safe summaries are sent.",
   "author": { "name": "Organized AI", "url": "https://scout.organizedai.vip" },
   "homepage": "https://scout.organizedai.vip",

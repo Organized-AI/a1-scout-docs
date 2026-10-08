@@ -39,7 +39,7 @@ test("initialize and list tools", async () => {
   assert.equal(init.result.serverInfo.name, "a1-scout");
   proc.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
   const list = await rpc("tools/list", {});
-  assert.deepEqual(list.result.tools.map(t => t.name), ["connect_scout", "scout_status", "preview_scout_summary", "sync_scout_now", "scout_settings", "disconnect_scout"]);
+  assert.deepEqual(list.result.tools.map(t => t.name), ["connect_scout", "scout_status", "preview_scout_summary", "sync_scout_now", "scout_settings", "delete_scout_transcripts", "disconnect_scout"]);
   assert.equal((await rpc("nope", {})).error.code, -32601);
 });
 

@@ -1,6 +1,6 @@
 // a1-scout-docs: public landing, docs and waitlist for A1 Scout at scout.organizedai.vip.
 // Pages are static assets. This Worker only answers /api/*.
-import { pairStart, pairInfo, pairApprove, pairPoll, evidence, profile } from "./connect.js";
+import { pairStart, pairInfo, pairApprove, pairPoll, evidence, profile, transcriptPut, transcriptsDelete } from "./connect.js";
 const json = (data, status = 200, extra = {}) =>
   new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json", "cache-control": "no-store", ...extra } });
 
@@ -67,6 +67,8 @@ export default {
     if (url.pathname === "/api/pair/poll" && req.method === "POST") return pairPoll(req, env);
     if (url.pathname === "/api/evidence" && req.method === "POST") return evidence(req, env);
     if (url.pathname === "/api/profile" && req.method === "GET") return profile(req, env);
+    if (url.pathname === "/api/transcripts" && req.method === "PUT") return transcriptPut(req, env, url);
+    if (url.pathname === "/api/transcripts" && req.method === "DELETE") return transcriptsDelete(req, env);
     if (url.pathname.startsWith("/api/")) return json({ error: "not_found" }, 404);
     return env.ASSETS ? env.ASSETS.fetch(req) : new Response("Not found", { status: 404 });
   }

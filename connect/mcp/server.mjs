@@ -4,7 +4,7 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { startPairing, finishPairing, previewNow, sync, syncIfDue, status, disconnect } from "../core/client.mjs";
+import { startPairing, finishPairing, previewNow, sync, syncIfDue, status, disconnect, deleteTranscripts } from "../core/client.mjs";
 import { loadSettings, saveSettings, VERSION } from "../core/collect.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -34,8 +34,13 @@ const TOOLS = [
       claude: { type: "boolean", description: "Read Claude Code and Cowork sessions." },
       codex: { type: "boolean", description: "Read Codex sessions." },
       auto_sync: { type: "boolean", description: "Send new sessions automatically while this app is open." },
-      exclude: { type: "array", items: { type: "string" }, description: "Project folder names or patterns to never read." } }, additionalProperties: false },
+      exclude: { type: "array", items: { type: "string" }, description: "Project folder names or patterns to never read." },
+      full_transcripts: { type: "boolean", description: "Opt in to also sending each session's full transcript (prompts, replies, code, file paths), with credentials scrubbed first. Off unless the person explicitly asks to turn it on." } }, additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false } },
+  { name: "delete_scout_transcripts", title: "Delete my transcripts from Scout",
+    description: "Delete every full transcript Scout stores for this person and turn full transcripts off. Session summaries are kept.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true } },
   { name: "disconnect_scout", title: "Disconnect from Scout",
     description: "Stop sending to Scout from this computer and forget its connection key.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
@@ -75,6 +80,7 @@ async function callTool(name, args = {}) {
     const p = st.profile, t = p.top;
     return [`Connected to Scout. ${p.sessions} sessions from ${p.computers} computer(s) and ${p.projects} project(s). Last session: ${p.last_session || "none"}.`,
       `Automatic sync: ${st.auto_sync ? "on" : "off"}. Reading: ${st.sources.join(" and ")}.${st.exclude.length ? ` Leaving out: ${st.exclude.join(", ")}.` : ""}`,
+      `Full transcripts: ${st.transcripts ? `on${p.transcripts ? ` (${p.transcripts.n} stored)` : ""}` : "off (summaries only)"}.`,
       `Languages: ${fmtList(t.languages)}`, `Libraries: ${fmtList(t.libraries)}`, `Packages: ${fmtList(t.packages)}`,
       `Models: ${fmtList(t.models)}`, `Commands: ${fmtList(t.commands)}`].join("\n");
   }
@@ -88,7 +94,7 @@ async function callTool(name, args = {}) {
   if (name === "sync_scout_now") {
     const r = await sync();
     if (r.status === "not_connected") return "Not connected yet. Use connect_scout first.";
-    return r.status === "sent" ? `Sent ${r.sessions} session summaries to Scout.` : "Scout is up to date; nothing new to send.";
+    return r.status === "sent" ? `Sent ${r.sessions} session summaries to Scout${r.transcripts ? ` and ${r.transcripts} full transcripts` : ""}.` : "Scout is up to date; nothing new to send.";
   }
   if (name === "scout_settings") {
     const patch = {};
@@ -96,9 +102,20 @@ async function callTool(name, args = {}) {
     if (typeof args.codex === "boolean") patch.codex = args.codex;
     if (typeof args.auto_sync === "boolean") patch.autoSync = args.auto_sync;
     if (Array.isArray(args.exclude)) patch.exclude = args.exclude.map(String).map(x => x.trim()).filter(Boolean).slice(0, 50);
+    if (typeof args.full_transcripts === "boolean") patch.transcripts = args.full_transcripts;
     saveSettings(patch);
     const s = loadSettings();
-    return `Saved. Reading: ${s.sources.join(" and ") || "nothing"}. Automatic sync: ${s.autoSync ? "on" : "off"}.${s.exclude.length ? ` Leaving out: ${s.exclude.join(", ")}.` : ""}`;
+    const tx = s.transcripts
+      ? " Full transcripts: on. From the next sync, Scout also stores each session's whole log (prompts, replies, code and file paths), with API keys, tokens and private keys replaced by [redacted:credential] on this computer first. The first sync sends your history. Use delete_scout_transcripts to remove them."
+      : " Full transcripts: off (summaries only).";
+    const forced = typeof args.full_transcripts === "boolean" && process.env.SCOUT_TRANSCRIPTS != null && s.transcripts !== args.full_transcripts
+      ? " Note: the Full transcripts checkbox in Claude's extension settings controls this here, so change it there." : "";
+    return `Saved. Reading: ${s.sources.join(" and ") || "nothing"}. Automatic sync: ${s.autoSync ? "on" : "off"}.${s.exclude.length ? ` Leaving out: ${s.exclude.join(", ")}.` : ""}${tx}${forced}`;
+  }
+  if (name === "delete_scout_transcripts") {
+    const r = await deleteTranscripts();
+    if (r.status === "not_connected") return "Not connected, so Scout holds no transcripts from this computer's connection.";
+    return `Deleted ${r.deleted} transcript(s) from Scout and turned full transcripts off. Session summaries are kept.`;
   }
   if (name === "disconnect_scout") { disconnect(); return "Disconnected. This computer no longer sends anything to Scout."; }
   throw new Error(`Unknown tool ${name}`);
@@ -111,7 +128,7 @@ async function handle(msg) {
   if (method === "initialize") return send({ jsonrpc: "2.0", id, result: {
     protocolVersion: params?.protocolVersion || "2025-06-18", capabilities: { tools: {} },
     serverInfo: { name: "a1-scout", title: "A1 Scout", version: VERSION },
-    instructions: "A1 Scout matches open models and tools to the work this person does. Use connect_scout when they want to connect, and always show them the link and code it returns. Use preview_scout_summary when they ask what is shared." } });
+    instructions: "A1 Scout matches open models and tools to the work this person does. Use connect_scout when they want to connect, and always show them the link and code it returns. Use preview_scout_summary when they ask what is shared. Full transcripts are opt-in: only turn them on (scout_settings full_transcripts) when the person clearly asks, after telling them it sends prompts, code and file paths." } });
   if (method === "ping") return send({ jsonrpc: "2.0", id, result: {} });
   if (method === "tools/list") return send({ jsonrpc: "2.0", id, result: { tools: TOOLS } });
   if (method === "tools/call") {

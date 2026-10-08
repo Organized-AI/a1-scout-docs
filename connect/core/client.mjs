@@ -2,7 +2,11 @@
 import { readFileSync } from "node:fs";
 import { settingsPath } from "./collect.mjs";
 const readPending = () => { try { return JSON.parse(readFileSync(settingsPath(), "utf8")).pending || null; } catch { return null; } };
-import { collect, commitCursor, loadSettings, preview, saveSettings, toBundles, VERSION } from "./collect.mjs";
+import { collect, commitCursor, loadSettings, preview, saveSettings, toBundles, VERSION, STATE_DIR } from "./collect.mjs";
+import { packTranscript } from "./transcripts.mjs";
+import { rmSync } from "node:fs";
+import { join } from "node:path";
+const savedFlag = k => { try { return JSON.parse(readFileSync(settingsPath(), "utf8"))[k] || null; } catch { return null; } };
 
 async function call(path, { method = "GET", body, key, settings = loadSettings() } = {}) {
   const r = await fetch(settings.server + path, {
@@ -42,16 +46,40 @@ export function previewNow({ all = false } = {}) {
 }
 
 // Collect what changed since last time and send it. Returns counts only.
+// With full transcripts turned on (opt-in), each of those sessions' whole log is also sent, credential-scrubbed and
+// gzipped; the first sync after opting in sends every session in the lookback window.
 export async function sync({ all = false } = {}) {
   const s = loadSettings();
   if (!s.key) return { status: "not_connected" };
-  const { rows, seen, skipped, filesScanned } = collect({ onlyChanged: !all, settings: s });
-  if (!rows.length) { commitCursor(seen); return { status: "up_to_date", files_scanned: filesScanned, skipped }; }
-  let stored = 0;
+  const backfill = s.transcripts && !savedFlag("transcriptsBackfilledAt");
+  const { rows, files, seen, skipped, filesScanned } = collect({ onlyChanged: !(all || backfill), settings: s, limit: all || backfill ? Infinity : 5000 });
+  if (!rows.length) { commitCursor(seen); if (backfill) saveSettings({ transcriptsBackfilledAt: new Date().toISOString() }); return { status: "up_to_date", files_scanned: filesScanned, skipped }; }
+  let stored = 0, transcripts = 0;
   for (const b of toBundles(rows)) stored += (await call("/api/evidence", { method: "POST", body: b, key: s.key, settings: s })).stored || 0;
+  if (s.transcripts) for (const f of files) {
+    const t = packTranscript(f, join(STATE_DIR, "outbox"));
+    if (!t.path) continue;
+    try { await putTranscript(t, s); transcripts++; } finally { rmSync(t.path, { force: true }); }
+  }
   commitCursor(seen);
-  saveSettings({ lastSync: new Date().toISOString() });
-  return { status: "sent", sessions: rows.length, stored, files_scanned: filesScanned, skipped };
+  saveSettings({ lastSync: new Date().toISOString(), ...(backfill ? { transcriptsBackfilledAt: new Date().toISOString() } : {}) });
+  return { status: "sent", sessions: rows.length, stored, transcripts, files_scanned: filesScanned, skipped };
+}
+
+async function putTranscript(t, s) {
+  const q = new URLSearchParams({ source: t.source, digest: t.digest, bytes: String(t.bytes), redacted: String(t.redacted) });
+  const r = await fetch(`${s.server}/api/transcripts?${q}`, { method: "PUT", body: readFileSync(t.path),
+    headers: { authorization: `Bearer ${s.key}`, "content-type": "application/gzip", "user-agent": `scout-connect/${VERSION}` } });
+  if (!r.ok) { let j = {}; try { j = await r.json(); } catch {} throw new Error(j.error || `Scout answered ${r.status} for a transcript`); }
+}
+
+// Delete every transcript Scout holds for this workspace. Summaries are kept.
+export async function deleteTranscripts() {
+  const s = loadSettings();
+  if (!s.key) return { status: "not_connected" };
+  const j = await call("/api/transcripts", { method: "DELETE", key: s.key, settings: s });
+  saveSettings({ transcripts: false, transcriptsBackfilledAt: null });
+  return { status: "deleted", deleted: j.deleted || 0 };
 }
 
 // Debounced sync for hooks and timers: at most once every `minutes`.
@@ -66,7 +94,7 @@ export async function syncIfDue({ minutes = 10 } = {}) {
 
 export async function status() {
   const s = loadSettings();
-  const base = { connected: Boolean(s.key), server: s.server, sources: s.sources, auto_sync: s.autoSync, exclude: s.exclude };
+  const base = { connected: Boolean(s.key), server: s.server, sources: s.sources, auto_sync: s.autoSync, exclude: s.exclude, transcripts: s.transcripts };
   if (!s.key) return base;
   try { return { ...base, profile: await call("/api/profile", { key: s.key, settings: s }) }; }
   catch (e) { return { ...base, error: e.message }; }

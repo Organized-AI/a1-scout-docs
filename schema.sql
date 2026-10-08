@@ -49,3 +49,15 @@ CREATE TABLE IF NOT EXISTS evidence (
   PRIMARY KEY (workspace_id, source, digest)
 );
 CREATE INDEX IF NOT EXISTS evidence_ws_time ON evidence (workspace_id, last_event);
+
+-- Full transcripts: opt-in on the computer. Objects live in R2 (TRANSCRIPTS) at ws/<workspace>/<source>/<digest>.jsonl.gz.
+CREATE TABLE IF NOT EXISTS transcripts (
+  workspace_id  TEXT NOT NULL,
+  source        TEXT NOT NULL,
+  digest        TEXT NOT NULL,
+  bytes         INTEGER,          -- uncompressed, after credential scrub
+  gz_bytes      INTEGER,
+  redacted      INTEGER,          -- credentials replaced on the computer
+  uploaded_at   TEXT NOT NULL,
+  PRIMARY KEY (workspace_id, source, digest)
+);

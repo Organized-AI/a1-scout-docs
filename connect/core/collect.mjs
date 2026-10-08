@@ -1,13 +1,14 @@
 // Read Claude Code and Codex session logs on this computer and turn each session into a small,
 // privacy-safe summary. Raw prompts, replies, file contents, paths and command arguments never leave this module.
-// It also reports token counts, models used and active minutes (numbers and model names only).
+// Shared by a1-scout (agent/scout-connect) and a1-scout-docs (connect/core); keep the two identical. It also reports token counts, models used and
+// active minutes (numbers and model names only) for the A1 dashboard's history and trends.
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir, platform, arch } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 import { findPrivacyProblem, validateBundle, BUNDLE_SCHEMA_VERSION } from "./rules.mjs";
 
-export const VERSION = "0.1.1";
+export const VERSION = "0.2.0";
 const HOME = homedir();
 export const STATE_DIR = process.env.SCOUT_HOME || join(HOME, ".scout");
 const sha256 = v => createHash("sha256").update(String(v ?? "")).digest("hex");
@@ -120,7 +121,7 @@ function toolName(name) {
 function newSig() {
   return { tools: {}, commands: {}, languages: {}, packages: new Set(), models: new Set(), imports: new Set(),
     errors: 0, edits: 0, turns: 0, events: 0, first: null, last: null, id: null, cwd: null, repo: null, model: null, app: null,
-    usage: new Map(), codexTokens: null, llms: {}, buckets: new Set(), subagents: 0 };
+    usage: new Map(), codexTokens: null, llms: {}, buckets: new Set(), subagents: 0, headless: false, failure: null, succeeded: false };
 }
 function stamp(sig, ts) {
   const t = Date.parse(ts || ""); if (!Number.isFinite(t)) return;
@@ -137,6 +138,7 @@ export function readClaude(lines) {
     if (o.sessionId && !sig.id) sig.id = o.sessionId;
     if (o.cwd && !sig.cwd) sig.cwd = o.cwd;
     if (o.entrypoint && /desktop|cowork/i.test(o.entrypoint)) sig.app = "claude-desktop";
+    if (o.entrypoint && /^sdk/i.test(o.entrypoint)) sig.headless = true; // claude -p and the Agent SDK
     const msg = o.message;
     if (o.type === "user" && msg && typeof msg.content === "string") sig.turns++;
     if (o.type === "user" && Array.isArray(msg?.content)) {
@@ -174,6 +176,7 @@ export function readCodex(lines) {
     if (o.type === "session_meta") {
       sig.id = sig.id || p.id || p.session_id; sig.cwd = sig.cwd || p.cwd;
       if (p.git?.repository_url) sig.repo = p.git.repository_url;
+      if (p.originator === "codex_exec" || p.source === "exec") sig.headless = true; // codex exec: scripted, not a person
       if (/desktop/i.test(p.originator || "")) sig.app = "codex-desktop"; else if (/vscode/i.test(p.originator || p.source || "")) sig.app = "codex-ide"; else sig.app = "codex-cli";
     }
     if (o.type === "turn_context" && p.model) { if (!sig.model) sig.model = String(p.model).slice(0, 40); bump(sig.llms, String(p.model).slice(0, 40)); }
@@ -184,6 +187,7 @@ export function readCodex(lines) {
         input: Math.max(0, (t.input_tokens || 0) - (t.cached_input_tokens || 0)), output: t.output_tokens || 0,
         cache_read: t.cached_input_tokens || 0, cache_write: t.cache_write_input_tokens || 0, reasoning: t.reasoning_output_tokens || 0 };
     }
+    if (o.type === "event_msg" && p.type === "task_complete") { if (p.error) sig.failure = failureKind(JSON.stringify(p.error)); else sig.succeeded = true; }
     if (o.type === "event_msg" && p.type === "task_started") sig.turns++;
     if (o.type === "event_msg" && p.type === "user_message") sig.turns += 0; // counted via task_started
     if (o.type !== "response_item") continue;
@@ -213,6 +217,21 @@ export function readCodex(lines) {
 const top = (m, n) => Object.fromEntries(Object.entries(m).filter(([k]) => k && k !== "null").sort((a, b) => b[1] - a[1]).slice(0, n));
 const safeList = (set, n, re) => [...set].filter(x => re.test(x) && !findPrivacyProblem(x)).slice(0, n);
 
+// A short category for a failed run; the error text itself never leaves the computer.
+export function failureKind(text) {
+  const t = String(text || "");
+  if (/not supported|model_not_found|does not exist|unknown model/i.test(t)) return "model_not_supported";
+  if (/high demand|rate.?limit|429|quota|usage limit/i.test(t)) return "rate_limited";
+  if (/401|403|unauthori[sz]ed|forbidden|log ?in/i.test(t)) return "auth";
+  if (/5\d\d|service unavailable|overloaded|timed? ?out/i.test(t)) return "server_error";
+  if (/404|not found/i.test(t)) return "not_found";
+  return "other";
+}
+// Orchestrators that launch coding agents on their own, recognized by their workspace folder. Only the label is sent.
+const HARNESS = [[/[\\/]\.paperclip[\\/]/i, "paperclip"], [/[\\/]\.?openclaw[\\/]/i, "openclaw"], [/[\\/]\.hermes[\\/]/i, "hermes"],
+  [/[\\/]factory-foreman[\\/]/i, "factory-foreman"], [/[\\/]\.conductor[\\/]|[\\/]conductor[\\/]workspaces[\\/]/i, "conductor"]];
+export const harnessOf = cwd => (HARNESS.find(([re]) => re.test(String(cwd || ""))) || [])[1];
+
 const MODEL_RE = /^[a-z0-9][a-z0-9._:\/-]{0,40}$/i;
 function tokensOf(sig) {
   if (sig.codexTokens) { const { total, ...t } = sig.codexTokens; return t; }
@@ -230,6 +249,8 @@ export function observationsOf(sig) {
     app: sig.app, model: sig.model && MODEL_RE.test(sig.model) ? sig.model : undefined,
     turns: sig.turns, edits: sig.edits, errors: sig.errors,
     active_minutes: sig.buckets.size * 5, subagents: sig.subagents || undefined,
+    launch: sig.headless ? "headless" : "interactive", harness: harnessOf(sig.cwd),
+    failure: sig.failure && !sig.succeeded && !tokens ? sig.failure : undefined,
     tokens, llms: Object.keys(llms).length ? llms : undefined,
     tools: top(sig.tools, 25), commands: top(Object.fromEntries(Object.entries(sig.commands).filter(([k]) => WORD.test(k))), 30),
     languages: top(sig.languages, 12),
@@ -254,6 +275,8 @@ export function loadSettings() {
     sources: [envBool("SCOUT_CLAUDE", s.claude !== false) && "claude", envBool("SCOUT_CODEX", s.codex !== false) && "codex"].filter(Boolean),
     exclude: (process.env.SCOUT_EXCLUDE ?? (s.exclude || []).join(",")).split(",").map(x => x.trim()).filter(Boolean),
     autoSync: envBool("SCOUT_AUTOSYNC", Boolean(s.autoSync)),
+    // Full transcripts are opt-in and off unless the person turns them on (settings or SCOUT_TRANSCRIPTS).
+    transcripts: envBool("SCOUT_TRANSCRIPTS", s.transcripts === true),
     lookbackDays: Number(process.env.SCOUT_LOOKBACK_DAYS || s.lookbackDays || 180),
   };
 }
@@ -269,9 +292,10 @@ export function isExcluded(cwd, exclude) {
 export function collect({ onlyChanged = true, settings = loadSettings(), limit = 5000 } = {}) {
   const cursor = onlyChanged ? loadJson(cursorPath(), {}) : {};
   const since = Date.now() - settings.lookbackDays * 86400e3;
-  const rows = [], seen = {}, skipped = { excluded: 0, empty: 0, old: 0, unchanged: 0 };
-  const files = listSessionFiles(settings.sources);
-  for (const { source, file } of files) {
+  // files: which local file each row came from, for opt-in transcripts. It stays on this computer, never in a bundle.
+  const rows = [], sessionFiles = [], seen = {}, skipped = { excluded: 0, empty: 0, old: 0, unchanged: 0 };
+  const allFiles = listSessionFiles(settings.sources);
+  for (const { source, file } of allFiles) {
     let st; try { st = statSync(file); } catch { continue; }
     if (st.mtimeMs < since) { skipped.old++; continue; }
     const key = sha256(file);
@@ -292,9 +316,10 @@ export function collect({ onlyChanged = true, settings = loadSettings(), limit =
       project_fingerprint: projectFingerprint(sig.repo || sig.cwd), evidence_quality: "full-transcript",
       event_count: sig.events, observations: observationsOf(sig),
     });
+    sessionFiles.push({ source, digest: rows.at(-1).native_session_digest, file });
     if (rows.length >= limit) break;
   }
-  return { rows, seen, skipped, filesScanned: files.length };
+  return { rows, files: sessionFiles, seen, skipped, filesScanned: allFiles.length };
 }
 
 export function toBundles(rows, { chunk = 400 } = {}) {

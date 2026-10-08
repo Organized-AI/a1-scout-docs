@@ -120,8 +120,54 @@ export async function profile(req, env) {
   }
   const top = (m, n) => Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, n).map(([name, count]) => ({ name, count }));
   return json({
+    transcripts: await transcriptCount(env, ws),
     workspace: ws, sessions: results.length, computers: computers.size, projects: projects.size, last_session: results[0]?.last_event || null,
     apps: agg.apps, top: { tools: top(agg.tools, 15), commands: top(agg.commands, 20), languages: top(agg.languages, 10),
       packages: top(agg.packages, 25), libraries: top(agg.imports, 25), models: top(agg.models, 15) },
   });
+}
+
+// ---------- full transcripts (opt-in on the computer; off by default) ----------
+// The connector only sends these when the person turned Full transcripts on. Each is one session's log, gzipped, with
+// credentials replaced on the computer first. Stored per workspace in R2 (ws/<workspace>/<source>/<digest>.jsonl.gz);
+// only for sessions whose summary this workspace already sent. delete_scout_transcripts removes all of them.
+const HEX64 = /^[a-f0-9]{64}$/;
+let txReady = null;
+function txTable(env) {
+  return txReady ||= env.DB.prepare(`CREATE TABLE IF NOT EXISTS transcripts (workspace_id TEXT NOT NULL, source TEXT NOT NULL, digest TEXT NOT NULL,
+    bytes INTEGER, gz_bytes INTEGER, redacted INTEGER, uploaded_at TEXT NOT NULL, PRIMARY KEY (workspace_id, source, digest))`).run().catch(e => { txReady = null; throw e; });
+}
+export async function transcriptPut(req, env, url) {
+  const ws = await deviceAuth(req, env);
+  if (!ws) return json({ error: "This computer isn't connected." }, 401);
+  if (!env.TRANSCRIPTS) return json({ error: "Transcript storage isn't available yet." }, 503);
+  const source = url.searchParams.get("source"), digest = String(url.searchParams.get("digest") || "");
+  if (!["claude", "codex", "cowork", "other"].includes(source) || !HEX64.test(digest)) return json({ error: "source and digest required" }, 400);
+  if (Number(req.headers.get("content-length") || 0) > 95 * 1024 * 1024) return json({ error: "That transcript is too large." }, 413);
+  const known = await env.DB.prepare("SELECT 1 FROM evidence WHERE workspace_id = ? AND source = ? AND digest = ?").bind(ws, source, digest).first();
+  if (!known) return json({ error: "Send the session summary first." }, 409);
+  await txTable(env);
+  const n = k => Math.max(0, Math.trunc(Number(url.searchParams.get(k)) || 0));
+  const obj = await env.TRANSCRIPTS.put(`ws/${ws}/${source}/${digest}.jsonl.gz`, req.body, { httpMetadata: { contentType: "application/gzip" } });
+  await env.DB.prepare(`INSERT INTO transcripts (workspace_id, source, digest, bytes, gz_bytes, redacted, uploaded_at) VALUES (?,?,?,?,?,?,?)
+    ON CONFLICT(workspace_id, source, digest) DO UPDATE SET bytes=excluded.bytes, gz_bytes=excluded.gz_bytes, redacted=excluded.redacted, uploaded_at=excluded.uploaded_at`)
+    .bind(ws, source, digest, n("bytes"), obj?.size ?? null, n("redacted"), now()).run();
+  return json({ ok: true });
+}
+export async function transcriptsDelete(req, env) {
+  const ws = await deviceAuth(req, env);
+  if (!ws) return json({ error: "This computer isn't connected." }, 401);
+  let deleted = 0, cursor;
+  if (env.TRANSCRIPTS) do {
+    const page = await env.TRANSCRIPTS.list({ prefix: `ws/${ws}/`, cursor, limit: 1000 });
+    if (page.objects.length) { await env.TRANSCRIPTS.delete(page.objects.map(o => o.key)); deleted += page.objects.length; }
+    cursor = page.truncated ? page.cursor : null;
+  } while (cursor);
+  await txTable(env);
+  await env.DB.prepare("DELETE FROM transcripts WHERE workspace_id = ?").bind(ws).run();
+  return json({ ok: true, deleted });
+}
+export async function transcriptCount(env, ws) {
+  try { await txTable(env); return await env.DB.prepare("SELECT COUNT(*) n, COALESCE(SUM(bytes), 0) bytes FROM transcripts WHERE workspace_id = ?").bind(ws).first(); }
+  catch { return null; }
 }

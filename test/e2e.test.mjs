@@ -101,3 +101,30 @@ test("expired and unknown codes", async () => {
   assert.equal((await browser("/api/pair/info?code=OLD1-OLD1"))[0], 410);
   assert.equal((await browser("/api/pair/info?code=NOPE-NOPE"))[0], 404);
 });
+
+test("full transcripts are opt-in: nothing until turned on, then history, then deleted on request", async () => {
+  const store = new Map();
+  env.TRANSCRIPTS = {
+    put: async (k, v) => { store.set(k, new Uint8Array(await new Response(v).arrayBuffer())); return { size: store.get(k).length }; },
+    list: async ({ prefix }) => ({ objects: [...store.keys()].filter(k => k.startsWith(prefix)).map(key => ({ key })), truncated: false }),
+    delete: async keys => { for (const k of [].concat(keys)) store.delete(k); },
+  };
+  const { saveSettings } = await import(join(root, "connect/core/collect.mjs"));
+  const off = await client.sync({ all: true });
+  assert.equal(off.transcripts, 0); assert.equal(store.size, 0);            // default: summaries only
+  saveSettings({ transcripts: true });
+  const on = await client.sync();                                           // first sync after opting in sends history
+  assert.ok(on.transcripts > 0); assert.equal(store.size, on.transcripts);
+  const ws = [...store.keys()][0].split("/")[1];
+  assert.ok([...store.keys()].every(k => k.startsWith(`ws/${ws}/`) && k.endsWith(".jsonl.gz")));
+  assert.equal((await client.sync()).status, "up_to_date");                 // then only what changed
+  const st = await client.status();
+  assert.equal(st.transcripts, true); assert.equal(st.profile.transcripts.n, store.size);
+  // A transcript for a session this workspace never summarized is refused.
+  const settings = JSON.parse(readFileSync(join(process.env.SCOUT_HOME, "settings.json"), "utf8"));
+  const r = await worker.fetch(new Request(`${ORIGIN}/api/transcripts?source=claude&digest=${"f".repeat(64)}`, { method: "PUT", body: "x", headers: { authorization: `Bearer ${settings.key}` } }), env);
+  assert.equal(r.status, 409);
+  const del = await client.deleteTranscripts();
+  assert.equal(del.deleted, on.transcripts); assert.equal(store.size, 0);
+  assert.equal((await client.status()).transcripts, false);
+});

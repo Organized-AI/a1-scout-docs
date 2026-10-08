@@ -14,11 +14,16 @@ h2{font:800 1.15rem "JetBrains Mono",monospace;margin:12px 0 0}a{color:var(--sun
 <ul><li>For each session: start and end time, number of events, and an anonymous fingerprint of the project.</li>
 <li>Counts of the tools, commands, languages, libraries, packages and Hugging Face model names used.</li>
 <li>An anonymous ID for your computer.</li></ul>
-<h2>What it never sends</h2>
+<h2>What it never sends (unless you turn on full transcripts)</h2>
 <ul><li>Your prompts, the assistant's replies, or file contents.</li>
 <li>File paths, folder names, project or client names, web addresses or email addresses.</li>
 <li>Passwords, API keys or tokens. Anything that looks like one stops the whole upload.</li></ul>
 <p>Scout checks every upload again on its side with the same rules and rejects it if anything slips through.</p>
+<h2 id="full">Full transcripts (opt-in, off by default)</h2>
+<p>If you turn on <b>Full transcripts</b> (a checkbox in the Claude extension's settings, or ask Claude or Codex to turn it on), Scout also stores each session's complete log: your prompts, the replies, code, file contents and file paths. The first sync after you turn it on sends your history; later syncs send sessions that changed.</p>
+<ul><li>Before anything leaves your computer, text shaped like an API key, access token or private key is replaced with <code>[redacted:credential]</code>. This catches common formats, not every secret, so leave out any project you don't want stored.</li>
+<li>Transcripts are stored privately for your workspace only, and only for sessions whose summary you already sent.</li>
+<li>Ask Claude or Codex to "delete my transcripts from Scout" at any time. Every stored transcript is deleted and the setting turns off; summaries are kept.</li></ul>
 <h2>Who sees it</h2>
 <p>Only the workspace you approved in your browser. Scout uses it to rank models and tools for you. We don't sell it or share it.</p>
 <h2>Stopping</h2>
