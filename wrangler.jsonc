@@ -8,7 +8,7 @@
   "workers_dev": true,
   "routes": [{ "pattern": "scout.organizedai.vip", "custom_domain": true }],
   "d1_databases": [
-    { "binding": "DB", "database_name": "a1-scout-waitlist", "database_id": "REPLACED_BY_SETUP" }
+    { "binding": "DB", "database_name": "a1-scout-waitlist", "database_id": "77f58d7b-6964-4659-a661-00251694092f" }
   ],
   "vars": {
     // Set these when ready; the page works without them.
