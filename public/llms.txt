@@ -1,0 +1,8 @@
+# A1 Scout
+
+> A1 Scout, by Organized AI, finds open models, datasets, Spaces, papers and code on Hugging Face and GitHub that fit a user's work, and downloads approved picks to storage the user owns (or a hosted stash) so they work offline.
+
+- [Home and waitlist](https://scout.organizedai.vip/): what A1 Scout does; join the waitlist with name and email.
+- [Docs](https://scout.organizedai.vip/docs/): documentation (in progress).
+
+Status: private beta with a waitlist. Built on Cloudflare Workers, D1 and KV.

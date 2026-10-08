@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "a1-scout-docs",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  // Public site. The Worker only handles /api/*; every page is a static asset.
+  "assets": { "directory": "./public", "run_worker_first": ["/api/*"], "not_found_handling": "404-page" },
+  "workers_dev": true,
+  "routes": [{ "pattern": "scout.organizedai.vip", "custom_domain": true }],
+  "d1_databases": [
+    { "binding": "DB", "database_name": "a1-scout-waitlist", "database_id": "77f58d7b-6964-4659-a661-00251694092f" }
+  ],
+  "vars": {
+    // Set these when ready; the page works without them.
+    "SURVEY_URL": "",   // Typeform link shown after someone joins
+    "GTM_ID": ""        // GTM-XXXXXXX; empty = no tag manager loaded
+  },
+  "observability": { "enabled": true }
+}

@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>A1 Scout · Organized AI</title>
+<meta name="description" content="A1 Scout finds the open models, datasets and code that fit your work, and stashes them on a drive you own so they keep working offline. Join the waitlist.">
+<meta property="og:title" content="A1 Scout">
+<meta property="og:description" content="Your offline AI stash, scouted for you. Join the waitlist.">
+<meta name="theme-color" content="#0f0f0e">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="alternate" type="text/plain" href="/llms.txt">
+<style>
+:root{
+  --bg:#0f0f0e; --panel:#181816; --panel2:#1f1f1c; --line:#2d2c28; --fg:#f2efe6; --muted:#a39f93;
+  --sun:#ffd84d; --sun-ink:#1a1600; --ok:#3ecf7a; --bad:#ff7a6b;
+  --mono:"JetBrains Mono", ui-monospace, Menlo, monospace; --sans:"IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg)}
+body{font:17px/1.6 var(--sans);padding-inline:16px;padding-block:0 48px}
+a{color:var(--sun)}
+.wrap{max-width:1080px;margin:0 auto}
+h1,h2,h3{font-family:var(--mono);line-height:1.12;margin:0;text-wrap:balance}
+h1{font-size:clamp(2.2rem,6vw,4.2rem);letter-spacing:-.03em;font-weight:800}
+h2{font-size:clamp(1.5rem,3.2vw,2.2rem);letter-spacing:-.02em}
+h3{font-size:1.05rem}
+p{margin:0}
+.muted{color:var(--muted)}
+:focus-visible{outline:2px solid var(--sun);outline-offset:3px;border-radius:6px}
+header.top{display:flex;align-items:center;gap:14px;padding-block:18px;border-bottom:1px solid var(--line)}
+.mark{width:34px;height:34px;border-radius:9px;background:var(--sun);color:var(--sun-ink);display:grid;place-items:center;font:800 .8rem var(--mono)}
+.wm{font:700 .82rem var(--mono);color:var(--sun);font-style:italic}
+.badge{font:700 .8rem var(--mono);border:1px solid var(--line);border-radius:7px;padding:4px 8px}
+header.top nav{margin-left:auto;display:flex;gap:8px}
+.pill{font:600 .85rem var(--mono);text-decoration:none;color:var(--fg);border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:8px 14px}
+.pill.sun{background:var(--sun);color:var(--sun-ink);border-color:var(--sun)}
+
+.hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:36px;align-items:center;padding-block:56px 40px}
+@media (max-width:860px){.hero{grid-template-columns:minmax(0,1fr)}}
+.hero .lede{font-size:1.15rem;max-width:56ch;margin-top:18px;color:#d8d4c8}
+.hero .cta{display:flex;gap:10px;flex-wrap:wrap;margin-top:26px}
+
+/* the drive card mirrors the real Scout dashboard */
+.drive{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--sun);border-radius:16px;padding:18px;display:grid;gap:12px;min-width:0}
+.drive .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--sun);display:inline-block}
+.dot.ok{background:var(--ok)}
+.host{font:600 .78rem var(--mono);border:1px solid var(--line);border-radius:999px;padding:5px 10px;color:var(--muted)}
+.host.on{border-color:var(--sun);color:var(--fg)}
+.run{background:var(--sun);color:var(--sun-ink);border-radius:12px;padding:12px 14px;font:700 .95rem var(--mono);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.run small{font-weight:500;opacity:.8}
+.item{font:500 .82rem var(--sans);border:1px solid var(--line);border-radius:999px;padding:5px 11px;background:var(--panel2);overflow-wrap:anywhere}
+.item i{font-style:normal;color:var(--muted);font-size:.75rem}
+.bar{height:6px;border-radius:6px;background:var(--panel2);overflow:hidden}
+.bar span{display:block;height:100%;width:38%;background:var(--sun);border-radius:6px}
+
+section{padding-block:44px;border-top:1px solid var(--line);display:grid;gap:22px}
+.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.feats{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+@media (max-width:760px){.steps{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:8px;align-content:start;min-width:0}
+.card .k{font:700 .75rem var(--mono);color:var(--sun);letter-spacing:.08em;text-transform:uppercase}
+.choice{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:640px){.choice{grid-template-columns:minmax(0,1fr)}}
+
+form.wl{background:var(--panel);border:1px solid var(--sun);border-radius:16px;padding:22px;display:grid;gap:14px;max-width:640px}
+.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:560px){.fields{grid-template-columns:minmax(0,1fr)}}
+label{display:grid;gap:6px;font:600 .82rem var(--mono);color:var(--muted)}
+input[type=text],input[type=email]{font:inherit;font-size:1rem;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;min-width:0}
+input:focus{border-color:var(--sun);outline:none}
+fieldset{border:0;padding:0;margin:0;display:flex;gap:8px;flex-wrap:wrap}
+legend{font:600 .82rem var(--mono);color:var(--muted);margin-bottom:8px}
+.opt input{position:absolute;opacity:0;pointer-events:none}
+.opt span{display:inline-block;font:600 .85rem var(--mono);border:1px solid var(--line);border-radius:999px;padding:8px 14px;cursor:pointer;color:var(--fg)}
+.opt input:checked+span{background:var(--sun);color:var(--sun-ink);border-color:var(--sun)}
+.opt input:focus-visible+span{outline:2px solid var(--sun);outline-offset:2px}
+button.go{font:700 1rem var(--mono);background:var(--sun);color:var(--sun-ink);border:0;border-radius:12px;padding:14px 18px;cursor:pointer;justify-self:start}
+button.go[disabled]{opacity:.6;cursor:wait}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.msg{font:500 .95rem var(--sans);min-height:1.4em}
+.msg.bad{color:var(--bad)}
+.done{display:grid;gap:10px}
+footer{margin-top:40px;padding-top:18px;border-top:1px solid var(--line);font:.8rem var(--mono);color:var(--muted);display:flex;gap:16px;flex-wrap:wrap}
+footer a{color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <span class="mark" aria-hidden="true">OA</span><span class="wm">organized ai</span>
+  <span class="badge">A1</span><strong style="font:800 1.2rem var(--mono)">Scout</strong>
+  <nav aria-label="Site"><a class="pill" href="/docs/">Docs</a><a class="pill sun" href="#join">Join the waitlist</a></nav>
+</header>
+
+<main>
+<div class="hero">
+  <div>
+    <h1>Your offline AI stash, scouted for you.</h1>
+    <p class="lede">A1 Scout watches Hugging Face and GitHub for the open models, datasets and code that fit the work you actually do. You approve the picks. The next time your drive is plugged in, Scout downloads them to storage you own, so they keep working with no internet and no API bill.</p>
+    <div class="cta"><a class="pill sun" href="#join">Join the waitlist</a><a class="pill" href="#how">See how it works</a></div>
+  </div>
+  <div class="drive" aria-label="Example of the Scout drive panel">
+    <div class="row"><span class="dot"></span><strong style="font-family:var(--mono)">A1 plugged in · Studio Mac</strong><span class="muted" style="font-size:.85rem">downloading</span></div>
+    <div class="row"><span class="host on"><span class="dot ok"></span> Studio Mac · A1 mounted</span><span class="host">Laptop · no A1</span><span class="host">Pi · no A1</span></div>
+    <div class="run">▶ Run now <small>3 approved · 8.9 GB</small></div>
+    <div class="bar" aria-hidden="true"><span id="bar"></span></div>
+    <div class="row"><span class="item">Qwen3.5-2B-Decision-MLX <i>3.8 GB</i></span><span class="item">Laya-322M-MLX <i>1.3 GB</i></span><span class="item">OpenEnv <i>code</i></span></div>
+    <span class="muted" style="font:500 .8rem var(--mono)">Example panel. Your drive, your picks.</span>
+  </div>
+</div>
+
+<section id="how">
+  <h2>How it works</h2>
+  <div class="steps">
+    <div class="card"><span class="k">Scout</span><h3>Finds what fits</h3><p class="muted">Scout scans the Hub on a schedule and scores new models, datasets, Spaces, papers and repos against the themes you care about. Authors you follow always surface.</p></div>
+    <div class="card"><span class="k">You</span><h3>Approve the picks</h3><p class="muted">Nothing downloads until you say so. Licenses that need your acceptance are flagged before anything lands on the drive.</p></div>
+    <div class="card"><span class="k">Drive</span><h3>Stashes it offline</h3><p class="muted">Plug the drive into any of your machines and the run starts by itself. Scout writes only inside its stash folder and never deletes a version you already have.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>What you get</h2>
+  <div class="feats">
+    <div class="card"><h3>One stash, many machines</h3><p class="muted">Macs and Linux boxes (a Raspberry Pi included) share one drive. The dashboard shows which machine has it and what is left to download.</p></div>
+    <div class="card"><h3>A bench for your models</h3><p class="muted">Score local models on decision tasks, like picking the right tool or template, before you trust them in a workflow.</p></div>
+    <div class="card"><h3>Safe to eject</h3><p class="muted">Scout tells you when a run is done and the drive is safe to unplug, and resumes partial downloads next time.</p></div>
+    <div class="card"><h3>Built on Cloudflare</h3><p class="muted">The scout runs on Cloudflare Workers with D1 and KV. The heavy files never pass through the cloud, only through your own connection to the Hub.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>Bring your own storage, or let us host it</h2>
+  <div class="choice">
+    <div class="card"><span class="k">Your drive</span><h3>Own storage</h3><p class="muted">An external NVMe or any drive you already have. Fully offline once the files are on it.</p></div>
+    <div class="card"><span class="k">Hosted</span><h3>Organized AI cloud stash</h3><p class="muted">For teams that want the same scouting with storage we run for you. Tell us below if this is the one you want.</p></div>
+  </div>
+</section>
+
+<section id="join">
+  <h2>Join the waitlist</h2>
+  <p class="muted" style="max-width:60ch">We are opening A1 Scout to a small group first. Leave your name and email and we will reach out when your spot opens.</p>
+  <form class="wl" id="wl" novalidate>
+    <div class="fields">
+      <label for="wl-name">Name<input id="wl-name" name="name" type="text" autocomplete="name" required maxlength="120"></label>
+      <label for="wl-email">Email<input id="wl-email" name="email" type="email" autocomplete="email" required maxlength="254"></label>
+    </div>
+    <fieldset>
+      <legend>Where would your stash live?</legend>
+      <label class="opt" for="st-own"><input id="st-own" type="radio" name="storage" value="own"><span>My own drive</span></label>
+      <label class="opt" for="st-hosted"><input id="st-hosted" type="radio" name="storage" value="hosted"><span>Hosted for me</span></label>
+      <label class="opt" for="st-unsure"><input id="st-unsure" type="radio" name="storage" value="unsure" checked><span>Not sure yet</span></label>
+    </fieldset>
+    <div class="hp" aria-hidden="true"><label for="wl-web">Website<input id="wl-web" name="website" type="text" tabindex="-1" autocomplete="off"></label></div>
+    <button class="go" id="wl-go" type="submit">Join the waitlist</button>
+    <p class="msg" id="wl-msg" role="status" aria-live="polite"></p>
+  </form>
+  <div class="done card" id="wl-done" hidden style="max-width:640px;border-color:var(--sun)">
+    <h3 id="wl-done-h">You're on the list.</h3>
+    <p class="muted" id="wl-done-p">We'll email you when your spot opens.</p>
+    <a class="pill sun" id="wl-survey" href="#" target="_blank" rel="noopener" hidden style="justify-self:start">Answer 4 quick questions</a>
+  </div>
+</section>
+</main>
+
+<footer><span>A1 Scout · Organized AI · Austin, TX</span><a href="/docs/">Docs</a><a href="/llms.txt">llms.txt</a></footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(function(){
+  window.dataLayer = window.dataLayer || [];
+  const ev = (event, extra={}) => window.dataLayer.push({event, page:"a1_scout_landing", ...extra});
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const qs = new URLSearchParams(location.search);
+  let cfg = {survey_url:null, gtm_id:null};
+  fetch("/api/config").then(r=>r.json()).then(c=>{
+    cfg = c;
+    if (c.gtm_id && /^GTM-[A-Z0-9]+$/.test(c.gtm_id)) {
+      window.dataLayer.push({"gtm.start": Date.now(), event:"gtm.js"});
+      const s=document.createElement("script"); s.async=true; s.src="https://www.googletagmanager.com/gtm.js?id="+c.gtm_id; document.head.appendChild(s);
+    }
+  }).catch(()=>{});
+  ev("docs_view");
+
+  if (window.gsap && !reduce) {
+    gsap.from(".hero h1, .hero .lede, .hero .cta", {y:14, duration:.6, stagger:.08, ease:"power2.out"});
+    gsap.from(".drive", {y:18, duration:.7, ease:"power2.out", delay:.15});
+    gsap.to("#bar", {width:"92%", duration:6, ease:"none", repeat:-1, repeatDelay:1});
+  }
+
+  const f = document.getElementById("wl"), msg = document.getElementById("wl-msg"), go = document.getElementById("wl-go");
+  let started = false;
+  f.addEventListener("focusin", () => { if (!started) { started = true; ev("signup_start"); } });
+  f.addEventListener("submit", async e => {
+    e.preventDefault();
+    msg.textContent = ""; msg.className = "msg";
+    const data = Object.fromEntries(new FormData(f));
+    data.source = qs.get("utm_source") || "";
+    if (!data.name.trim()) { msg.textContent = "Add your name."; msg.classList.add("bad"); return; }
+    if (!/^\S+@\S+\.\S+$/.test(data.email.trim())) { msg.textContent = "That email doesn't look right."; msg.classList.add("bad"); return; }
+    go.disabled = true; go.textContent = "Joining…";
+    try {
+      const r = await fetch("/api/waitlist", {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(data)});
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "Something went wrong. Try again.");
+      ev("waitlist_join", {storage_choice: data.storage});
+      f.hidden = true;
+      const d = document.getElementById("wl-done"); d.hidden = false;
+      if (j.already) { document.getElementById("wl-done-h").textContent = "You're already on the list."; }
+      const url = j.survey_url || cfg.survey_url;
+      if (url) { const a = document.getElementById("wl-survey"); a.href = url + (url.includes("?")?"&":"?") + "email=" + encodeURIComponent(data.email.trim()); a.hidden = false;
+        document.getElementById("wl-done-p").textContent = "Help us set up your stash: four quick questions about how you'd use it."; a.onclick = () => ev("survey_open"); }
+      if (window.gsap && !reduce) gsap.from(d, {y:10, duration:.5, ease:"power2.out"});
+    } catch (err) {
+      msg.textContent = err.message; msg.classList.add("bad");
+    } finally { go.disabled = false; go.textContent = "Join the waitlist"; }
+  });
+})();
+</script>
+</body>
+</html>
