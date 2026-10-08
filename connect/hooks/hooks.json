@@ -1,0 +1,11 @@
+{
+  "description": "A1 Scout: send a summary of new sessions after a session ends (at most every 10 minutes).",
+  "hooks": {
+    "SessionEnd": [
+      { "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-end.mjs\"", "timeout": 3 } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-end.mjs\"", "timeout": 3 } ] }
+    ]
+  }
+}

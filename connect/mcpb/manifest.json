@@ -1,0 +1,45 @@
+{
+  "manifest_version": "0.3",
+  "name": "a1-scout",
+  "display_name": "A1 Scout",
+  "version": "0.1.0",
+  "description": "Match open models and tools to the work you do in Claude and Codex.",
+  "long_description": "A1 Scout reads your Claude Code and Codex history on this computer and sends Scout only a summary: which tools, commands, languages, libraries and models you used, with counts and dates. Your prompts, replies, file contents, file paths, project names, web addresses, emails and keys never leave your computer. Ask Claude to \"connect me to A1 Scout\" to start.",
+  "author": { "name": "Organized AI", "url": "https://scout.organizedai.vip" },
+  "homepage": "https://scout.organizedai.vip",
+  "documentation": "https://scout.organizedai.vip/docs/",
+  "support": "https://scout.organizedai.vip",
+  "icon": "icon.png",
+  "license": "MIT",
+  "keywords": ["huggingface", "models", "workflow"],
+  "server": {
+    "type": "node",
+    "entry_point": "mcp/server.mjs",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/mcp/server.mjs"],
+      "env": {
+        "SCOUT_CLAUDE": "${user_config.claude_sessions}",
+        "SCOUT_CODEX": "${user_config.codex_sessions}",
+        "SCOUT_AUTOSYNC": "${user_config.auto_sync}",
+        "SCOUT_EXCLUDE": "${user_config.exclude}"
+      }
+    }
+  },
+  "tools": [
+    { "name": "connect_scout", "description": "Connect this computer to A1 Scout with a short code you approve in your browser." },
+    { "name": "scout_status", "description": "Show the connection and what Scout knows about your work." },
+    { "name": "preview_scout_summary", "description": "Show exactly what would be sent. Sends nothing." },
+    { "name": "sync_scout_now", "description": "Send new session summaries now." },
+    { "name": "scout_settings", "description": "Choose what Scout reads and which projects to leave out." },
+    { "name": "disconnect_scout", "description": "Stop sending and forget this computer's connection." }
+  ],
+  "user_config": {
+    "claude_sessions": { "type": "boolean", "title": "Claude Code and Cowork history", "description": "Read your Claude Code and Cowork sessions on this computer.", "default": true, "required": false },
+    "codex_sessions": { "type": "boolean", "title": "Codex history", "description": "Read your Codex sessions on this computer.", "default": true, "required": false },
+    "auto_sync": { "type": "boolean", "title": "Sync automatically", "description": "Send new session summaries while Claude is open (at most every 30 minutes).", "default": true, "required": false },
+    "exclude": { "type": "string", "title": "Projects to leave out", "description": "Folder names or patterns, separated by commas, like client-* or private-notes.", "default": "", "required": false }
+  },
+  "compatibility": { "platforms": ["darwin", "win32"], "runtimes": { "node": ">=20.0.0" } },
+  "privacy_policies": ["https://scout.organizedai.vip/privacy/"]
+}

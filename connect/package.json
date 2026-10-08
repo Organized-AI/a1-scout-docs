@@ -1,0 +1,10 @@
+{
+  "name": "scout-connect",
+  "version": "0.1.0",
+  "description": "Connect your Claude and Codex sessions to A1 Scout. Reads logs on your computer and sends only privacy-safe summaries.",
+  "license": "MIT",
+  "type": "module",
+  "bin": { "scout-connect": "core/cli.mjs" },
+  "engines": { "node": ">=20" },
+  "scripts": { "test": "node --test test/*.test.mjs" }
+}

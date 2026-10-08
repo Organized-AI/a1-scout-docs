@@ -4,5 +4,7 @@
 
 - [Home and waitlist](https://scout.organizedai.vip/): what A1 Scout does; join the waitlist with name and email.
 - [Docs](https://scout.organizedai.vip/docs/): documentation (in progress).
+- [Connect](https://scout.organizedai.vip/#connect): add A1 Scout to Claude (download a1-scout.mcpb) or Codex (plugin marketplace Organized-AI/a1-scout-docs).
+- [Privacy](https://scout.organizedai.vip/privacy/): what the connector reads and sends.
 
 Status: private beta with a waitlist. Built on Cloudflare Workers, D1 and KV.

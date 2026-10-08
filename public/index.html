@@ -94,7 +94,7 @@ footer a{color:var(--muted)}
 <header class="top">
   <span class="mark" aria-hidden="true">OA</span><span class="wm">organized ai</span>
   <span class="badge">A1</span><strong style="font:800 1.2rem var(--mono)">Scout</strong>
-  <nav aria-label="Site"><a class="pill" href="/docs/">Docs</a><a class="pill sun" href="#join">Join the waitlist</a></nav>
+  <nav aria-label="Site"><a class="pill" href="#connect">Connect</a><a class="pill" href="/docs/">Docs</a><a class="pill sun" href="#join">Join the waitlist</a></nav>
 </header>
 
 <main>
@@ -139,6 +139,17 @@ footer a{color:var(--muted)}
     <div class="card"><span class="k">Your drive</span><h3>Own storage</h3><p class="muted">An external NVMe or any drive you already have. Fully offline once the files are on it.</p></div>
     <div class="card"><span class="k">Hosted</span><h3>Organized AI cloud stash</h3><p class="muted">For teams that want the same scouting with storage we run for you. Tell us below if this is the one you want.</p></div>
   </div>
+</section>
+
+<section id="connect">
+  <h2>Connect your AI work</h2>
+  <p class="muted" style="max-width:62ch">Scout learns what you build from your Claude and Codex history, then picks the open models and tools that fit. It reads your history on your computer and sends only a summary: tools, languages and libraries, with counts. Your prompts, files and project names stay with you.</p>
+  <div class="feats">
+    <div class="card"><span class="k">Claude app</span><h3>Add to Claude</h3><p class="muted">Download, then double-click the file. Claude opens it and shows checkboxes for Claude and Codex history. Then ask Claude: "connect me to A1 Scout".</p><a class="pill sun" id="dl-mcpb" href="/download/a1-scout.mcpb" style="justify-self:start">Download for Claude</a></div>
+    <div class="card"><span class="k">Codex app</span><h3>Add to Codex</h3><p class="muted">In Codex, open Plugins, add the marketplace <code>Organized-AI/a1-scout-docs</code>, and install A1 Scout. Then ask Codex: "connect me to A1 Scout".</p><button class="pill" type="button" data-copy="Organized-AI/a1-scout-docs" style="justify-self:start;cursor:pointer">Copy marketplace name</button></div>
+    <div class="card"><span class="k">Claude Code</span><h3>Install the plugin</h3><p class="muted">In Claude Code, type these two lines. It syncs by itself after each session.</p><code style="font:500 .78rem var(--mono);overflow-wrap:anywhere">/plugin marketplace add Organized-AI/a1-scout-docs<br>/plugin install a1-scout@organized-ai</code></div>
+  </div>
+  <p class="muted" style="font-size:.9rem"><a href="/privacy/">Exactly what is shared</a> · Open source on <a href="https://github.com/Organized-AI/a1-scout-docs/tree/main/connect" rel="noopener">GitHub</a></p>
 </section>
 
 <section id="join">
@@ -193,6 +204,11 @@ footer a{color:var(--muted)}
     gsap.to("#bar", {width:"92%", duration:6, ease:"none", repeat:-1, repeatDelay:1});
   }
 
+  document.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = "Copied"; } catch { b.textContent = b.dataset.copy; }
+    ev("connect_copy_marketplace");
+  }));
+  const dl = document.getElementById("dl-mcpb"); if (dl) dl.addEventListener("click", () => ev("connect_download_claude"));
   const f = document.getElementById("wl"), msg = document.getElementById("wl-msg"), go = document.getElementById("wl-go");
   let started = false;
   f.addEventListener("focusin", () => { if (!started) { started = true; ev("signup_start"); } });

@@ -1,5 +1,6 @@
 // a1-scout-docs: public landing, docs and waitlist for A1 Scout at scout.organizedai.vip.
 // Pages are static assets. This Worker only answers /api/*.
+import { pairStart, pairInfo, pairApprove, pairPoll, evidence, profile } from "./connect.js";
 const json = (data, status = 200, extra = {}) =>
   new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json", "cache-control": "no-store", ...extra } });
 
@@ -60,6 +61,12 @@ export default {
     if (url.pathname === "/api/config") return json({ survey_url: env.SURVEY_URL || null, gtm_id: env.GTM_ID || null }, 200, { "cache-control": "public, max-age=300" });
     if (url.pathname === "/api/waitlist" && req.method === "POST") return join(req, env);
     if (url.pathname === "/api/waitlist" && req.method === "GET") return exportList(req, env, url);
+    if (url.pathname === "/api/pair/start" && req.method === "POST") return pairStart(req, env, url);
+    if (url.pathname === "/api/pair/info" && req.method === "GET") return pairInfo(req, env, url);
+    if (url.pathname === "/api/pair/approve" && req.method === "POST") return pairApprove(req, env);
+    if (url.pathname === "/api/pair/poll" && req.method === "POST") return pairPoll(req, env);
+    if (url.pathname === "/api/evidence" && req.method === "POST") return evidence(req, env);
+    if (url.pathname === "/api/profile" && req.method === "GET") return profile(req, env);
     if (url.pathname.startsWith("/api/")) return json({ error: "not_found" }, 404);
     return env.ASSETS ? env.ASSETS.fetch(req) : new Response("Not found", { status: 404 });
   }

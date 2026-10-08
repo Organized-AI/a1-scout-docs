@@ -1,0 +1,14 @@
+{
+  "name": "organized-ai",
+  "owner": { "name": "Organized AI", "url": "https://scout.organizedai.vip" },
+  "metadata": { "description": "Organized AI plugins" },
+  "plugins": [
+    {
+      "name": "a1-scout",
+      "source": "./connect",
+      "description": "Connect your Claude Code and Codex sessions to A1 Scout to get open models and tools matched to your work.",
+      "version": "0.1.0",
+      "category": "productivity"
+    }
+  ]
+}
