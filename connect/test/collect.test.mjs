@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, utimesSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { makeFixtures } from "./fixtures.mjs";
+import { makeFixtures, makeUsageFixtures, CODEX_ID, CODEX_NEXT } from "./fixtures.mjs";
 const FX = makeFixtures();
 process.env.SCOUT_HOME = mkdtempSync(join(tmpdir(), "scout-"));
 process.env.SCOUT_ENV_ID_FILE = join(process.env.SCOUT_HOME, "env-id");
@@ -82,4 +82,35 @@ test("inline scripts count as code, not commands", () => {
   C.shellSignals("python3 - <<'PY'\nimport pandas as pd\nfrom sklearn import svm\nconst x = 1\nPY\nnode -e \"const fs=require('fs'); import('x')\" && git status", sig);
   assert.deepEqual(Object.keys(sig.commands).sort(), ["git", "node", "python3"]);
   assert.ok(sig.imports.has("pandas") && sig.imports.has("sklearn"));
+});
+
+// Reads the usage fixtures by pointing the source folders there for one call.
+function collectUsage() {
+  const UX = makeUsageFixtures(), saved = { ...C.SOURCE_DIRS };
+  Object.assign(C.SOURCE_DIRS, { claude: join(UX, "claude"), codex: join(UX, "codex") });
+  try { return C.collect({ onlyChanged: false }).rows; } finally { Object.assign(C.SOURCE_DIRS, saved); }
+}
+
+test("token usage, models used, active minutes and subagents (numbers and model names only)", () => {
+  const rows = collectUsage();
+  assert.equal(rows.length, 4);
+  assert.equal(findPrivacyProblem(JSON.stringify(rows)), null);
+  assert.ok(!JSON.stringify(rows).includes("/Users/"));
+  const by = id => rows.find(r => r.native_session_digest === C.sessionDigest(id.source, id.id))?.observations;
+  const main = by({ source: "claude", id: "u-1" });
+  assert.deepEqual(main.tokens, { input: 13, output: 24, cache_read: 100, cache_write: 5 }); // m1 once (last wins), <synthetic> skipped
+  assert.deepEqual(main.llms, { "claude-opus-5-5": 1, "claude-sonnet-5": 1 });
+  assert.equal(main.active_minutes, 15); assert.equal(main.subagents, 1);
+  const codex = by({ source: "codex", id: CODEX_ID });
+  assert.deepEqual(codex.tokens, { input: 1100, output: 80, cache_read: 900, cache_write: 0, reasoning: 10 });
+  assert.deepEqual(codex.llms, { "gpt-5.5-codex": 1, "openai/gpt-oss-120b": 1 });
+  assert.equal(codex.active_minutes, 10); assert.equal(codex.subagents, undefined);
+});
+
+test("files that reuse a session id get their own rows", () => {
+  const rows = collectUsage();
+  const has = (source, id) => rows.some(r => r.native_session_digest === C.sessionDigest(source, id));
+  assert.ok(has("claude", "u-1") && has("claude", "u-1:agent-x"));
+  assert.ok(has("codex", CODEX_ID) && has("codex", `${CODEX_ID}:rollout-2026-10-04T10-30-00-${CODEX_ID}_${CODEX_NEXT}`));
+  assert.deepEqual(rows.find(r => r.native_session_digest === C.sessionDigest("claude", "u-1:agent-x")).observations.llms, { "claude-haiku-5": 1 });
 });

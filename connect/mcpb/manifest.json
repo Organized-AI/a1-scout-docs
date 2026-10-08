@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "a1-scout",
   "display_name": "A1 Scout",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Match open models and tools to the work you do in Claude and Codex.",
   "long_description": "A1 Scout reads your Claude Code and Codex history on this computer and sends Scout only a summary: which tools, commands, languages, libraries and models you used, with counts and dates. Your prompts, replies, file contents, file paths, project names, web addresses, emails and keys never leave your computer. Ask Claude to \"connect me to A1 Scout\" to start.",
   "author": { "name": "Organized AI", "url": "https://scout.organizedai.vip" },

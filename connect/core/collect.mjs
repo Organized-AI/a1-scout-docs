@@ -1,12 +1,13 @@
 // Read Claude Code and Codex session logs on this computer and turn each session into a small,
 // privacy-safe summary. Raw prompts, replies, file contents, paths and command arguments never leave this module.
+// It also reports token counts, models used and active minutes (numbers and model names only).
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir, platform, arch } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 import { findPrivacyProblem, validateBundle, BUNDLE_SCHEMA_VERSION } from "./rules.mjs";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.1.1";
 const HOME = homedir();
 export const STATE_DIR = process.env.SCOUT_HOME || join(HOME, ".scout");
 const sha256 = v => createHash("sha256").update(String(v ?? "")).digest("hex");
@@ -118,10 +119,12 @@ function toolName(name) {
 
 function newSig() {
   return { tools: {}, commands: {}, languages: {}, packages: new Set(), models: new Set(), imports: new Set(),
-    errors: 0, edits: 0, turns: 0, events: 0, first: null, last: null, id: null, cwd: null, repo: null, model: null, app: null };
+    errors: 0, edits: 0, turns: 0, events: 0, first: null, last: null, id: null, cwd: null, repo: null, model: null, app: null,
+    usage: new Map(), codexTokens: null, llms: {}, buckets: new Set(), subagents: 0 };
 }
 function stamp(sig, ts) {
   const t = Date.parse(ts || ""); if (!Number.isFinite(t)) return;
+  sig.buckets.add(Math.floor(t / 300e3)); // 5-minute slots with activity, for active minutes
   if (!sig.first || t < sig.first) sig.first = t;
   if (!sig.last || t > sig.last) sig.last = t;
 }
@@ -140,8 +143,15 @@ export function readClaude(lines) {
       if (msg.content.some(c => c.type === "text")) sig.turns++;
       for (const c of msg.content) if (c.type === "tool_result" && c.is_error) sig.errors++;
     }
+    if (o.isSidechain && o.type === "user" && !o.parentUuid) sig.subagents++;
     if (o.type === "assistant" && msg) {
       if (msg.model && !sig.model) sig.model = String(msg.model).slice(0, 40);
+      // One API message is logged across several lines that repeat its usage: count each message id once, last value wins.
+      if (msg.usage && msg.model !== "<synthetic>") {
+        const u = msg.usage;
+        sig.usage.set(msg.id || `${sig.usage.size}`, { input: u.input_tokens || 0, output: u.output_tokens || 0,
+          cache_read: u.cache_read_input_tokens || 0, cache_write: u.cache_creation_input_tokens || 0, model: msg.model });
+      }
       for (const c of Array.isArray(msg.content) ? msg.content : []) {
         if (c.type !== "tool_use") continue;
         bump(sig.tools, toolName(c.name));
@@ -166,7 +176,14 @@ export function readCodex(lines) {
       if (p.git?.repository_url) sig.repo = p.git.repository_url;
       if (/desktop/i.test(p.originator || "")) sig.app = "codex-desktop"; else if (/vscode/i.test(p.originator || p.source || "")) sig.app = "codex-ide"; else sig.app = "codex-cli";
     }
-    if (o.type === "turn_context" && p.model && !sig.model) sig.model = String(p.model).slice(0, 40);
+    if (o.type === "turn_context" && p.model) { if (!sig.model) sig.model = String(p.model).slice(0, 40); bump(sig.llms, String(p.model).slice(0, 40)); }
+    // Codex logs running totals; keep the largest. Its input_tokens already include the cached part.
+    if (o.type === "event_msg" && p.type === "token_count" && p.info?.total_token_usage) {
+      const t = p.info.total_token_usage;
+      if (!sig.codexTokens || (t.total_tokens || 0) >= sig.codexTokens.total) sig.codexTokens = { total: t.total_tokens || 0,
+        input: Math.max(0, (t.input_tokens || 0) - (t.cached_input_tokens || 0)), output: t.output_tokens || 0,
+        cache_read: t.cached_input_tokens || 0, cache_write: t.cache_write_input_tokens || 0, reasoning: t.reasoning_output_tokens || 0 };
+    }
     if (o.type === "event_msg" && p.type === "task_started") sig.turns++;
     if (o.type === "event_msg" && p.type === "user_message") sig.turns += 0; // counted via task_started
     if (o.type !== "response_item") continue;
@@ -196,11 +213,24 @@ export function readCodex(lines) {
 const top = (m, n) => Object.fromEntries(Object.entries(m).filter(([k]) => k && k !== "null").sort((a, b) => b[1] - a[1]).slice(0, n));
 const safeList = (set, n, re) => [...set].filter(x => re.test(x) && !findPrivacyProblem(x)).slice(0, n);
 
+const MODEL_RE = /^[a-z0-9][a-z0-9._:\/-]{0,40}$/i;
+function tokensOf(sig) {
+  if (sig.codexTokens) { const { total, ...t } = sig.codexTokens; return t; }
+  if (!sig.usage.size) return undefined;
+  const t = { input: 0, output: 0, cache_read: 0, cache_write: 0 };
+  for (const u of sig.usage.values()) { t.input += u.input; t.output += u.output; t.cache_read += u.cache_read; t.cache_write += u.cache_write; bump(sig.llms, String(u.model || "").slice(0, 40)); }
+  return t;
+}
+
 // The only shape that leaves the computer.
 export function observationsOf(sig) {
+  const tokens = tokensOf(sig);
+  const llms = Object.fromEntries(Object.entries(sig.llms).filter(([k]) => MODEL_RE.test(k)).slice(0, 8));
   const obs = {
-    app: sig.app, model: sig.model && /^[a-z0-9][a-z0-9._:-]{0,40}$/i.test(sig.model) ? sig.model : undefined,
+    app: sig.app, model: sig.model && MODEL_RE.test(sig.model) ? sig.model : undefined,
     turns: sig.turns, edits: sig.edits, errors: sig.errors,
+    active_minutes: sig.buckets.size * 5, subagents: sig.subagents || undefined,
+    tokens, llms: Object.keys(llms).length ? llms : undefined,
     tools: top(sig.tools, 25), commands: top(Object.fromEntries(Object.entries(sig.commands).filter(([k]) => WORD.test(k))), 30),
     languages: top(sig.languages, 12),
     packages: safeList(sig.packages, 40, PKG), models: safeList(sig.models, 20, HF_REPO),
@@ -252,7 +282,10 @@ export function collect({ onlyChanged = true, settings = loadSettings(), limit =
     const sig = source === "claude" ? readClaude(lines) : readCodex(lines);
     if (!sig.first || sig.events < 2) { skipped.empty++; continue; }
     if (isExcluded(sig.cwd, settings.exclude)) { skipped.excluded++; continue; }
-    const id = sig.id || basename(file, ".jsonl");
+    // Some files reuse another file's session id: Claude Code subagents (<session>/subagents/agent-*.jsonl) and Codex
+    // continuations (rollout-..._<uuid>.jsonl). Key those by file name so they don't overwrite the original session.
+    const shared = /[\\/]subagents[\\/]/.test(file) || (source === "codex" && /_[0-9a-f-]{36}\.jsonl$/i.test(file));
+    const id = (shared && sig.id ? `${sig.id}:${basename(file, ".jsonl")}` : sig.id) || basename(file, ".jsonl");
     rows.push({
       source, native_session_digest: sessionDigest(source, id),
       first_event: new Date(sig.first).toISOString(), last_event: new Date(sig.last).toISOString(),
