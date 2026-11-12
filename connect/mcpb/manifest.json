@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "a1-scout",
   "display_name": "A1 Scout",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Match open models and tools to the work you do in Claude and Codex.",
   "long_description": "A1 Scout reads your Claude Code and Codex history on this computer and sends Scout only a summary: which tools, commands, languages, libraries and models you used, with counts and dates. Your prompts, replies, file contents, file paths, project names, web addresses, emails and keys never leave your computer, unless you turn on Full transcripts (opt-in), which stores each session's whole log with keys and tokens removed first. Ask Claude to \"connect me to A1 Scout\" to start.",
   "author": { "name": "Organized AI", "url": "https://scout.organizedai.vip" },
@@ -29,6 +29,7 @@
   },
   "tools": [
     { "name": "connect_scout", "description": "Connect this computer to A1 Scout with a short code you approve in your browser." },
+    { "name": "link_phone", "description": "Approve the phone link code the person supplied for this workspace." },
     { "name": "scout_status", "description": "Show the connection and what Scout knows about your work." },
     { "name": "preview_scout_summary", "description": "Show exactly what would be sent. Sends nothing." },
     { "name": "sync_scout_now", "description": "Send new session summaries now." },

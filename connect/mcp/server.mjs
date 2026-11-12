@@ -5,7 +5,9 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { startPairing, finishPairing, previewNow, sync, syncIfDue, status, disconnect, deleteTranscripts, linkPhone } from "../core/client.mjs";
-import { loadSettings, saveSettings, VERSION } from "../core/collect.mjs";
+import { loadSettings, saveSettings } from "../core/collect.mjs";
+
+const VERSION = "0.3.0";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, "..", "core", "cli.mjs");
@@ -21,7 +23,7 @@ const TOOLS = [
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true } },
   { name: "scout_status", title: "Scout status",
-    description: "Show whether this computer is connected to Scout, when it last synced, and a summary of the work profile Scout has (top tools, languages, libraries, models).",
+    description: "Show whether this computer is connected, last sync, and the work profile including Claude Desktop (Cowork), Claude chat and ChatGPT app session counts plus tools, languages, libraries and models.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: true } },
   { name: "preview_scout_summary", title: "Preview what Scout receives",
@@ -88,6 +90,7 @@ async function callTool(name, args = {}) {
     const p = st.profile, t = p.top;
     return [`Connected to Scout. ${p.sessions} sessions from ${p.computers} computer(s) and ${p.projects} project(s). Last session: ${p.last_session || "none"}.`,
       `Automatic sync: ${st.auto_sync ? "on" : "off"}. Reading: ${st.sources.join(" and ")}.${st.exclude.length ? ` Leaving out: ${st.exclude.join(", ")}.` : ""}`,
+      `Apps (sessions): ${fmtObj(p.apps || {})}. Claude Desktop (Cowork): ${(p.apps?.["claude-cowork"] || 0) + (p.apps?.["claude-desktop"] || 0)}; Claude chat: ${p.apps?.["claude-chat"] || 0}; ChatGPT: ${p.apps?.chatgpt || 0}.`,
       `Full transcripts: ${st.transcripts ? `on${p.transcripts ? ` (${p.transcripts.n} stored)` : ""}` : "off (summaries only)"}.`,
       `Languages: ${fmtList(t.languages)}`, `Libraries: ${fmtList(t.libraries)}`, `Packages: ${fmtList(t.packages)}`,
       `Models: ${fmtList(t.models)}`, `Commands: ${fmtList(t.commands)}`].join("\n");

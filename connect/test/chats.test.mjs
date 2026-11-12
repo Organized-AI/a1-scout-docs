@@ -45,7 +45,7 @@ test("browser signal helpers match collector helpers on identical inputs", () =>
   const original = new Function("basename", "extname", "findPrivacyProblem", (block + tail).replace(/export /g, "") + ";return {langOf,shellSignals,codeSignals,patchSignals,toolName,newSig,stamp,observationsOf}")(basename, extname, findPrivacyProblem);
   const results = [];
   for (const helper of [signals, original]) {
-    const sig = helper.newSig(); sig.app = "claude-chat";
+    const sig = helper.newSig(); sig.app = "claude-chat"; sig.harness = "scheduled-task";
     helper.shellSignals('npm install gsap; pip install requests; python3 app.py', sig);
     helper.codeSignals('import requests\nfrom_pretrained("Qwen/Qwen3-4B")', sig);
     helper.patchSignals('*** Add File: code.ts\n+import numpy', sig);

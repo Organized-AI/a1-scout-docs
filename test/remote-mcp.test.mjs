@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import { mcpHandler, chatLogBundle } from "../src/remote-mcp.js";
+import { profile } from "../src/connect.js";
+import { createHash } from "node:crypto";
 
 const input = { app: "claude-chat", model: "claude-sonnet-4-5", turns: 3, tools: { Bash: 2 }, languages: { python: 1 }, packages: ["requests"], models: ["claude-sonnet-4-5"], imports: ["json"], chat_ref: "12345678-1234-4321-8123-123456789abc" };
 async function setup() {
@@ -13,7 +15,7 @@ async function setup() {
   const env = { DB: { prepare: statement, batch: async statements => Promise.all(statements.map(item => item.run())) } };
   const context = { props: { workspace: "ws_test" }, auth: { scope: ["scout:chat"] } };
   const call = (method, params, ctx = context, headers = {}) => mcpHandler.fetch(new Request("https://scout.example/mcp", { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) }), env, ctx);
-  return { db, call, context };
+  return { db, call, context, env };
 }
 
 test("remote MCP initialization, tools, authenticated logging and workspace isolation", async () => {
@@ -30,8 +32,19 @@ test("remote MCP initialization, tools, authenticated logging and workspace isol
   assert.ok(!JSON.stringify(saved).includes(input.chat_ref));
   const profile = JSON.parse((await (await call("tools/call", { name: "scout_status" })).json()).result.content[0].text);
   assert.equal(profile.sessions, 1);
+  assert.equal(profile.apps["claude-chat"], 1);
   const other = JSON.parse((await (await call("tools/call", { name: "scout_status" }, { ...context, props: { workspace: "ws_other" } })).json()).result.content[0].text);
   assert.equal(other.sessions, 0);
+});
+
+test("profile API aggregates Claude chat and ChatGPT apps in the authenticated workspace", async () => {
+  const { db, call, env } = await setup();
+  for (const app of ["claude-chat", "chatgpt"]) await call("tools/call", { name: "scout_log_chat", arguments: { ...input, app } });
+  const key = "synthetic-device-key", hash = createHash("sha256").update(key).digest("hex");
+  db.prepare("INSERT INTO device_keys (key_hash, workspace_id, client, created_at) VALUES (?, 'ws_test', 'synthetic', '2026-01-01')").run(hash);
+  const response = await profile(new Request("https://scout.example/api/profile", { headers: { authorization: `Bearer ${key}` } }), env);
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).apps, { "claude-chat": 1, chatgpt: 1 });
 });
 
 test("remote MCP rejects private text, malformed signals and unauthorized requests", async () => {

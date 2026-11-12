@@ -34,6 +34,8 @@ process.env.SCOUT_HOME = mkdtempSync(join(tmpdir(), "scout-e2e-"));
 process.env.SCOUT_ENV_ID_FILE = join(process.env.SCOUT_HOME, "env");
 process.env.SCOUT_CLAUDE_DIR = join(FX, "claude");
 process.env.SCOUT_CODEX_DIR = join(FX, "codex");
+process.env.SCOUT_COWORK_DIR = join(FX, "cowork");
+process.env.SCOUT_DESKTOP_DIR = join(FX, "desktop");
 process.env.SCOUT_LOOKBACK_DAYS = "100000";
 process.env.SCOUT_SERVER = ORIGIN;
 globalThis.fetch = (url, init) => worker.fetch(new Request(url, init), env); // the client talks to the Worker directly

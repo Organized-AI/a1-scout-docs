@@ -27,9 +27,9 @@ Setup references: [Claude custom connectors](https://support.claude.com/en/artic
 ## Connector files
 
 - `core/rules.mjs` bundle schema + privacy rules (shared with the Worker, runs in Node and Workers)
-- `core/collect.mjs` readers for Claude and Codex logs, signal extraction, bundles, cursor
+- `core/collect.mjs` readers for Claude Code, Claude Desktop (Cowork) and Codex logs, signal extraction, bundles, cursor
 - `core/client.mjs` pairing, sync, status
-- `mcp/server.mjs` stdio MCP server: connect_scout, scout_status, preview_scout_summary, sync_scout_now, scout_settings, disconnect_scout
+- `mcp/server.mjs` stdio MCP server: connect_scout, link_phone, scout_status, preview_scout_summary, sync_scout_now, scout_settings, disconnect_scout
 - `hooks/` session-end hook (Claude format; Codex sets CLAUDE_PLUGIN_ROOT for compatibility)
 - `skills/scout/SKILL.md`, `.claude-plugin/`, `.codex-plugin/`, `.mcp.json` plugin packaging
 - `mcpb/` Claude Desktop extension manifest + icon; `scripts/build-mcpb.sh` builds `public/download/a1-scout.mcpb`

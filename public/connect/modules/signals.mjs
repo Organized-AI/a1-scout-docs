@@ -110,7 +110,7 @@ export function observationsOf(sig) {
     app: sig.app, model: sig.model && MODEL_RE.test(sig.model) ? sig.model : undefined,
     turns: sig.turns, edits: sig.edits, errors: sig.errors,
     active_minutes: sig.buckets.size * 5, subagents: sig.subagents || undefined,
-    launch: sig.headless ? "headless" : "interactive", harness: harnessOf(sig.cwd),
+    launch: sig.headless ? "headless" : "interactive", harness: sig.harness || harnessOf(sig.cwd),
     failure: sig.failure && !sig.succeeded && !tokens ? sig.failure : undefined,
     tokens, llms: Object.keys(llms).length ? llms : undefined,
     tools: top(sig.tools, 25), commands: top(Object.fromEntries(Object.entries(sig.commands).filter(([k]) => WORD.test(k))), 30),
