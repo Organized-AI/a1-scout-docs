@@ -4,7 +4,7 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { startPairing, finishPairing, previewNow, sync, syncIfDue, status, disconnect, deleteTranscripts } from "../core/client.mjs";
+import { startPairing, finishPairing, previewNow, sync, syncIfDue, status, disconnect, deleteTranscripts, linkPhone } from "../core/client.mjs";
 import { loadSettings, saveSettings, VERSION } from "../core/collect.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -12,6 +12,10 @@ const CLI = join(HERE, "..", "core", "cli.mjs");
 const AUTO_MINUTES = Number(process.env.SCOUT_SYNC_MINUTES || 30);
 
 const TOOLS = [
+  { name: "link_phone", title: "Link my phone to A1 Scout",
+    description: "Approve the XXXX-XXXX code shown on the person's Scout phone link page, connecting that browser to this computer's workspace. Only approve a code the person supplied.",
+    inputSchema: { type: "object", properties: { code: { type: "string", pattern: "^[A-Za-z2-9]{4}-[A-Za-z2-9]{4}$" } }, required: ["code"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true } },
   { name: "connect_scout", title: "Connect to A1 Scout",
     description: "Connect this computer to A1 Scout so it can match Hugging Face models and tools to the work you do in Claude and Codex. Returns a short code and a link for the person to open and approve. After they approve, the first summary is sent automatically.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
@@ -64,6 +68,10 @@ const fmtList = (items, n = 8) => (items || []).slice(0, n).map(x => `${x.name} 
 const fmtObj = (o, n = 10) => Object.entries(o || {}).slice(0, n).map(([k, v]) => `${k} (${v})`).join(", ") || "none";
 
 async function callTool(name, args = {}) {
+  if (name === "link_phone") {
+    await linkPhone(args.code);
+    return "Phone approved. Keep the phone link page open; it finishes linking automatically.";
+  }
   if (name === "connect_scout") {
     const s = loadSettings();
     if (s.key) { const r = await sync(); return `This computer is already connected to Scout. ${r.status === "sent" ? `Sent ${r.sessions} new session summaries.` : "Everything is up to date."}`; }

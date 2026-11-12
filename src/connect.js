@@ -16,12 +16,57 @@ const PAIR_MINUTES = 15;
 async function ipHash(req) { const ip = req.headers.get("cf-connecting-ip") || ""; return ip ? (await sha(ip + "|scout-connect")).slice(0, 24) : null; }
 async function body(req) { try { return await req.json(); } catch { return {}; } }
 
-async function deviceAuth(req, env) {
+export async function deviceAuth(req, env) {
   const h = req.headers.get("authorization") || "";
-  if (!h.startsWith("Bearer ")) return null;
-  const row = await env.DB.prepare("SELECT workspace_id FROM device_keys WHERE key_hash = ?").bind(await sha(h.slice(7).trim())).first();
-  if (row) await env.DB.prepare("UPDATE device_keys SET last_used = ? WHERE key_hash = ?").bind(now(), await sha(h.slice(7).trim())).run();
+  const key = h.startsWith("Bearer ") ? h.slice(7).trim()
+    : req.headers.get("origin") === new URL(req.url).origin ? cookie(req, "scout_dev") : "";
+  if (!key) return null;
+  const hash = await sha(key);
+  const row = await env.DB.prepare("SELECT workspace_id FROM device_keys WHERE key_hash = ?").bind(hash).first();
+  if (row) await env.DB.prepare("UPDATE device_keys SET last_used = ? WHERE key_hash = ?").bind(now(), hash).run();
   return row?.workspace_id || null;
+}
+
+export async function linkStart(req, env) {
+  if (req.headers.get("origin") !== new URL(req.url).origin) return json({ error: "Open the link page on this site." }, 403);
+  const ih = await ipHash(req);
+  const secret = cookie(req, "scout_ws");
+  const workspace = secret ? await env.DB.prepare("SELECT id FROM workspaces WHERE browser_hash = ?").bind(await sha(secret)).first() : null;
+  const code = code8(), poll = rand(32), expires = new Date(Date.now() + 10 * 60e3).toISOString();
+  const inserted = await env.DB.prepare("INSERT INTO links (code, poll_hash, workspace_id, status, ip_hash, created_at, expires_at) SELECT ?, ?, ?, ?, ?, ?, ? WHERE ? IS NULL OR (SELECT COUNT(*) FROM links WHERE ip_hash = ? AND created_at > ?) < 10")
+    .bind(code, await sha(poll), workspace?.id || null, workspace ? "approved" : "pending", ih, now(), expires, ih, ih, new Date(Date.now() - 3600e3).toISOString()).run();
+  if (!inserted.meta.changes) return json({ error: "Too many link attempts. Try again in an hour." }, 429);
+  return json({ code, poll_token: poll, expires_at: expires });
+}
+
+export async function linkApprove(req, env) {
+  if (!(req.headers.get("authorization") || "").startsWith("Bearer ")) return json({ error: "Approve from a connected computer." }, 401);
+  const workspace = await deviceAuth(req, env);
+  if (!workspace) return json({ error: "Connect this computer first." }, 401);
+  const input = await body(req), code = String(input.code || "").toUpperCase().trim();
+  if (!/^[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(code)) return json({ error: "Enter the XXXX-XXXX phone code." }, 400);
+  const result = await env.DB.prepare("UPDATE links SET status = 'approved', workspace_id = ? WHERE code = ? AND status = 'pending' AND expires_at > ?")
+    .bind(workspace, code, now()).run();
+  if (!result.meta.changes) return json({ error: "That code expired, was used, or wasn't found." }, 409);
+  return json({ ok: true });
+}
+
+export async function linkPoll(req, env) {
+  if (req.headers.get("origin") !== new URL(req.url).origin) return json({ error: "Use the same-origin phone link page." }, 403);
+  const input = await body(req), hash = await sha(String(input.poll_token || ""));
+  const link = await env.DB.prepare("SELECT * FROM links WHERE poll_hash = ?").bind(hash).first();
+  if (!link) return json({ status: "unknown" }, 404);
+  if (link.status === "collected") return json({ status: "collected" }, 409);
+  if (link.expires_at <= now()) return json({ status: "expired" }, 410);
+  if (link.status === "pending") return json({ status: "pending" });
+  const key = "sk_scout_" + rand(24);
+  const result = await env.DB.batch([
+    env.DB.prepare("INSERT INTO device_keys (key_hash, workspace_id, client, created_at) SELECT ?, workspace_id, 'phone-browser', ? FROM links WHERE poll_hash = ? AND status = 'approved' AND expires_at > ?")
+      .bind(await sha(key), now(), hash, now()),
+    env.DB.prepare("UPDATE links SET status = 'collected' WHERE poll_hash = ? AND status = 'approved'").bind(hash),
+  ]);
+  if (result[0].meta.changes !== 1) return json({ status: "collected" }, 409);
+  return json({ status: "approved" }, 200, { "set-cookie": `scout_dev=${key}; Path=/; Max-Age=31536000; HttpOnly; Secure; SameSite=Strict` });
 }
 
 export async function pairStart(req, env, url) {
@@ -138,6 +183,7 @@ function txTable(env) {
     bytes INTEGER, gz_bytes INTEGER, redacted INTEGER, uploaded_at TEXT NOT NULL, PRIMARY KEY (workspace_id, source, digest))`).run().catch(e => { txReady = null; throw e; });
 }
 export async function transcriptPut(req, env, url) {
+  if (!(req.headers.get("authorization") || "").startsWith("Bearer ")) return json({ error: "Use a connected computer for transcripts." }, 401);
   const ws = await deviceAuth(req, env);
   if (!ws) return json({ error: "This computer isn't connected." }, 401);
   if (!env.TRANSCRIPTS) return json({ error: "Transcript storage isn't available yet." }, 503);
@@ -155,6 +201,7 @@ export async function transcriptPut(req, env, url) {
   return json({ ok: true });
 }
 export async function transcriptsDelete(req, env) {
+  if (!(req.headers.get("authorization") || "").startsWith("Bearer ")) return json({ error: "Use a connected computer for transcripts." }, 401);
   const ws = await deviceAuth(req, env);
   if (!ws) return json({ error: "This computer isn't connected." }, 401);
   let deleted = 0, cursor;
