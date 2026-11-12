@@ -1,6 +1,6 @@
 // a1-scout-docs: public landing, docs and waitlist for A1 Scout at scout.organizedai.vip.
-// Pages are static assets. This Worker only answers /api/*.
-import { pairStart, pairInfo, pairApprove, pairPoll, evidence, profile, transcriptPut, transcriptsDelete } from "./connect.js";
+// Static pages, connect API, and OAuth-protected remote MCP.
+import { pairStart, pairInfo, pairApprove, pairPoll, linkStart, linkApprove, linkPoll, evidence, profile, transcriptPut, transcriptsDelete } from "./connect.js";
 const json = (data, status = 200, extra = {}) =>
   new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json", "cache-control": "no-store", ...extra } });
 
@@ -54,7 +54,7 @@ async function exportList(req, env, url) {
   return json({ count: results.length, people: results });
 }
 
-export default {
+export const publicWorker = {
   async fetch(req, env) {
     const url = new URL(req.url);
     if (url.pathname === "/api/health") return json({ ok: true, service: "a1-scout-docs" });
@@ -65,6 +65,10 @@ export default {
     if (url.pathname === "/api/pair/info" && req.method === "GET") return pairInfo(req, env, url);
     if (url.pathname === "/api/pair/approve" && req.method === "POST") return pairApprove(req, env);
     if (url.pathname === "/api/pair/poll" && req.method === "POST") return pairPoll(req, env);
+    if (url.pathname === "/api/link/start" && req.method === "POST") return linkStart(req, env);
+    if (url.pathname === "/api/link/approve" && req.method === "POST") return linkApprove(req, env);
+    if (url.pathname === "/api/link/poll" && req.method === "POST") return linkPoll(req, env);
+    if (url.pathname === "/api/profile" && req.method === "POST") return profile(req, env);
     if (url.pathname === "/api/evidence" && req.method === "POST") return evidence(req, env);
     if (url.pathname === "/api/profile" && req.method === "GET") return profile(req, env);
     if (url.pathname === "/api/transcripts" && req.method === "PUT") return transcriptPut(req, env, url);
@@ -72,4 +76,15 @@ export default {
     if (url.pathname.startsWith("/api/")) return json({ error: "not_found" }, 404);
     return env.ASSETS ? env.ASSETS.fetch(req) : new Response("Not found", { status: 404 });
   }
+};
+
+export default {
+  async fetch(req, env, ctx) {
+    const path = new URL(req.url).pathname;
+    if (path === "/mcp" || path.startsWith("/mcp/") || path === "/authorize" || path.startsWith("/oauth/") || path.startsWith("/.well-known/")) {
+      const { oauthWorker } = await import("./oauth.js");
+      return oauthWorker.fetch(req, env, ctx);
+    }
+    return publicWorker.fetch(req, env, ctx);
+  },
 };

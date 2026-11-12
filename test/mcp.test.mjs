@@ -28,6 +28,7 @@ const FX = makeFixtures();
 
 const proc = spawn(process.execPath, [join(root, "connect/mcp/server.mjs")], { stdio: ["pipe", "pipe", "inherit"], env: { ...process.env,
   SCOUT_HOME: HOME, SCOUT_ENV_ID_FILE: join(HOME, "env"), SCOUT_CLAUDE_DIR: join(FX, "claude"), SCOUT_CODEX_DIR: join(FX, "codex"),
+  SCOUT_COWORK_DIR: join(FX, "cowork"), SCOUT_DESKTOP_DIR: join(FX, "desktop"),
   SCOUT_LOOKBACK_DAYS: "100000", SCOUT_SERVER: SERVER, SCOUT_NO_TIMERS: "1" } });
 let buf = ""; const waiters = new Map(); let nextId = 1;
 proc.stdout.on("data", d => { buf += d; let i; while ((i = buf.indexOf("\n")) >= 0) { const m = JSON.parse(buf.slice(0, i)); buf = buf.slice(i + 1); waiters.get(m.id)?.(m); } });
@@ -37,9 +38,10 @@ const tool = async (name, args = {}) => (await rpc("tools/call", { name, argumen
 test("initialize and list tools", async () => {
   const init = await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } });
   assert.equal(init.result.serverInfo.name, "a1-scout");
+  assert.equal(init.result.serverInfo.version, "0.3.0");
   proc.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
   const list = await rpc("tools/list", {});
-  assert.deepEqual(list.result.tools.map(t => t.name), ["connect_scout", "scout_status", "preview_scout_summary", "sync_scout_now", "scout_settings", "delete_scout_transcripts", "disconnect_scout"]);
+  assert.deepEqual(list.result.tools.map(t => t.name), ["link_phone", "connect_scout", "scout_status", "preview_scout_summary", "sync_scout_now", "scout_settings", "delete_scout_transcripts", "disconnect_scout"]);
   assert.equal((await rpc("nope", {})).error.code, -32601);
 });
 
@@ -61,11 +63,12 @@ test("connect: link + code, approve in browser, first sync happens by itself", a
   assert.equal(db.prepare("SELECT COUNT(*) n FROM evidence").get().n, 3);
   const st = await tool("scout_status");
   assert.match(st, /Connected to Scout\. 3 sessions from 1 computer/); assert.match(st, /mlx-community\/clef-flash-4bit/);
+  assert.match(st, /Claude Desktop \(Cowork\): 0; Claude chat: 0; ChatGPT: 0/);
   assert.match(await tool("sync_scout_now"), /up to date/);
 });
 
 test("settings and disconnect", async () => {
-  assert.match(await tool("scout_settings", { codex: false, exclude: ["client-*"] }), /Reading: claude\. .*Leaving out: client-\*/);
+  assert.match(await tool("scout_settings", { codex: false, exclude: ["client-*"] }), /Reading: claude and cowork\. .*Leaving out: client-\*/);
   assert.match(await tool("disconnect_scout"), /Disconnected/);
   assert.match(await tool("scout_status"), /Not connected/);
   proc.stdin.end(); http.close();

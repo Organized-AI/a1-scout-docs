@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex"><title>Link your phone · A1 Scout</title>
+<link rel="stylesheet" href="/connect/phone.css">
+</head>
+<body>
+<main class="wrap">
+<a href="/">← A1 Scout</a>
+<h1>Your chats. Your work profile.</h1>
+<section class="card" aria-labelledby="link-title">
+<h2 id="link-title">Link this phone browser</h2>
+<p>Ask Claude on your phone or computer:</p>
+<p>“Link my phone to A1 Scout, code <strong class="code" id="code">…</strong>”</p>
+<p class="muted">Use a Claude or Codex connection that is already linked to your Scout workspace. This code works for 10 minutes.</p>
+<p id="status" role="status" aria-live="polite">Getting a code…</p>
+<button id="retry" hidden>Get a new code</button>
+</section>
+<p class="muted">Linking shares no chats. You choose an export, review names and counts on this phone, then decide whether to send.</p>
+</main>
+<script type="module" src="/connect/link/link.mjs"></script>
+</body></html>

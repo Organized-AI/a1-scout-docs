@@ -16,6 +16,8 @@ const sha256 = v => createHash("sha256").update(String(v ?? "")).digest("hex");
 export const SOURCE_DIRS = {
   claude: process.env.SCOUT_CLAUDE_DIR || join(HOME, ".claude", "projects"),
   codex: process.env.SCOUT_CODEX_DIR || join(HOME, ".codex", "sessions"),
+  cowork: process.env.SCOUT_COWORK_DIR || join(HOME, "Library", "Application Support", "Claude", "local-agent-mode-sessions"),
+  desktop: process.env.SCOUT_DESKTOP_DIR || join(HOME, "Library", "Application Support", "Claude", "claude-code-sessions"),
 };
 
 // Same salt file as the AI Work Assessment, so both tools report the same opaque computer ID.
@@ -49,10 +51,21 @@ function walk(dir, test, out = []) {
   }
   return out;
 }
-export function listSessionFiles(sources = ["claude", "codex"]) {
+export function listSessionFiles(sources = ["claude", "codex", "cowork"]) {
   const files = [];
   if (sources.includes("claude")) for (const f of walk(SOURCE_DIRS.claude, n => n.endsWith(".jsonl"))) files.push({ source: "claude", file: f });
   if (sources.includes("codex")) for (const f of walk(SOURCE_DIRS.codex, n => /^rollout-.*\.jsonl$/.test(n))) files.push({ source: "codex", file: f });
+  if (sources.includes("cowork")) for (const metaFile of walk(SOURCE_DIRS.cowork, n => /^local_.*\.json$/.test(n))) {
+    const raw = loadJson(metaFile, {});
+    const metadata = { id: raw.cliSessionId, model: raw.model, created: raw.createdAt, last: raw.lastActivityAt,
+      scheduled: Boolean(raw.scheduledTaskId), folder: Array.isArray(raw.userSelectedFolders) && typeof raw.userSelectedFolders[0] === "string" ? raw.userSelectedFolders[0] : undefined };
+    if (typeof metadata.id !== "string" || !/^[a-zA-Z0-9-]+$/.test(metadata.id)) continue;
+    const root = join(dirname(metaFile), basename(metaFile, ".json"), ".claude", "projects");
+    for (const file of walk(root, n => n.endsWith(".jsonl"))) {
+      if (basename(file) !== `${metadata.id}.jsonl` && !file.includes(`${metadata.id}/subagents/`)) continue;
+      files.push({ source: "cowork", file, metadata });
+    }
+  }
   return files;
 }
 
@@ -249,7 +262,7 @@ export function observationsOf(sig) {
     app: sig.app, model: sig.model && MODEL_RE.test(sig.model) ? sig.model : undefined,
     turns: sig.turns, edits: sig.edits, errors: sig.errors,
     active_minutes: sig.buckets.size * 5, subagents: sig.subagents || undefined,
-    launch: sig.headless ? "headless" : "interactive", harness: harnessOf(sig.cwd),
+    launch: sig.headless ? "headless" : "interactive", harness: sig.harness || harnessOf(sig.cwd),
     failure: sig.failure && !sig.succeeded && !tokens ? sig.failure : undefined,
     tokens, llms: Object.keys(llms).length ? llms : undefined,
     tools: top(sig.tools, 25), commands: top(Object.fromEntries(Object.entries(sig.commands).filter(([k]) => WORD.test(k))), 30),
@@ -272,7 +285,8 @@ export function loadSettings() {
   return {
     server: process.env.SCOUT_SERVER || s.server || "https://scout.organizedai.vip",
     key: process.env.SCOUT_KEY || s.key || null,
-    sources: [envBool("SCOUT_CLAUDE", s.claude !== false) && "claude", envBool("SCOUT_CODEX", s.codex !== false) && "codex"].filter(Boolean),
+    sources: [envBool("SCOUT_CLAUDE", s.claude !== false) && "claude", envBool("SCOUT_CODEX", s.codex !== false) && "codex",
+      envBool("SCOUT_COWORK", s.cowork ?? envBool("SCOUT_CLAUDE", s.claude !== false)) && "cowork"].filter(Boolean),
     exclude: (process.env.SCOUT_EXCLUDE ?? (s.exclude || []).join(",")).split(",").map(x => x.trim()).filter(Boolean),
     autoSync: envBool("SCOUT_AUTOSYNC", Boolean(s.autoSync)),
     // Full transcripts are opt-in and off unless the person turns them on (settings or SCOUT_TRANSCRIPTS).
@@ -295,15 +309,27 @@ export function collect({ onlyChanged = true, settings = loadSettings(), limit =
   // files: which local file each row came from, for opt-in transcripts. It stays on this computer, never in a bundle.
   const rows = [], sessionFiles = [], seen = {}, skipped = { excluded: 0, empty: 0, old: 0, unchanged: 0 };
   const allFiles = listSessionFiles(settings.sources);
-  for (const { source, file } of allFiles) {
+  const scheduled = new Set();
+  if (settings.sources.includes("claude")) for (const file of walk(SOURCE_DIRS.desktop, n => /^local_.*\.json$/.test(n))) {
+    const raw = loadJson(file, {});
+    if (typeof raw.sessionId === "string" && raw.scheduledTaskId) scheduled.add(raw.sessionId);
+  }
+  for (const { source, file, metadata } of allFiles) {
     let st; try { st = statSync(file); } catch { continue; }
     if (st.mtimeMs < since) { skipped.old++; continue; }
     const key = sha256(file);
-    const mark = `${st.size}:${Math.round(st.mtimeMs)}`;
+    const mark = `${st.size}:${Math.round(st.mtimeMs)}:${sha256(JSON.stringify(metadata || [...scheduled].sort()))}`;
     seen[key] = mark;
     if (cursor[key] === mark) { skipped.unchanged++; continue; }
     let lines; try { lines = readFileSync(file, "utf8").split("\n").filter(Boolean); } catch { continue; }
-    const sig = source === "claude" ? readClaude(lines) : readCodex(lines);
+    const sig = source === "codex" ? readCodex(lines) : readClaude(lines);
+    if (source === "cowork") {
+      sig.app = "claude-cowork";
+      sig.model ||= metadata.model;
+    }
+    if (metadata?.scheduled || (sig.app === "claude-desktop" && scheduled.has(sig.id))) {
+      sig.headless = true; sig.harness = "scheduled-task";
+    }
     if (!sig.first || sig.events < 2) { skipped.empty++; continue; }
     if (isExcluded(sig.cwd, settings.exclude)) { skipped.excluded++; continue; }
     // Some files reuse another file's session id: Claude Code subagents (<session>/subagents/agent-*.jsonl) and Codex
@@ -313,7 +339,7 @@ export function collect({ onlyChanged = true, settings = loadSettings(), limit =
     rows.push({
       source, native_session_digest: sessionDigest(source, id),
       first_event: new Date(sig.first).toISOString(), last_event: new Date(sig.last).toISOString(),
-      project_fingerprint: projectFingerprint(sig.repo || sig.cwd), evidence_quality: "full-transcript",
+      project_fingerprint: projectFingerprint(metadata?.folder || sig.repo || sig.cwd), evidence_quality: "full-transcript",
       event_count: sig.events, observations: observationsOf(sig),
     });
     sessionFiles.push({ source, digest: rows.at(-1).native_session_digest, file });

@@ -4,20 +4,26 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { startPairing, finishPairing, previewNow, sync, syncIfDue, status, disconnect, deleteTranscripts } from "../core/client.mjs";
-import { loadSettings, saveSettings, VERSION } from "../core/collect.mjs";
+import { startPairing, finishPairing, previewNow, sync, syncIfDue, status, disconnect, deleteTranscripts, linkPhone } from "../core/client.mjs";
+import { loadSettings, saveSettings } from "../core/collect.mjs";
+
+const VERSION = "0.3.0";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, "..", "core", "cli.mjs");
 const AUTO_MINUTES = Number(process.env.SCOUT_SYNC_MINUTES || 30);
 
 const TOOLS = [
+  { name: "link_phone", title: "Link my phone to A1 Scout",
+    description: "Approve the XXXX-XXXX code shown on the person's Scout phone link page, connecting that browser to this computer's workspace. Only approve a code the person supplied.",
+    inputSchema: { type: "object", properties: { code: { type: "string", pattern: "^[A-Za-z2-9]{4}-[A-Za-z2-9]{4}$" } }, required: ["code"], additionalProperties: false },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true } },
   { name: "connect_scout", title: "Connect to A1 Scout",
     description: "Connect this computer to A1 Scout so it can match Hugging Face models and tools to the work you do in Claude and Codex. Returns a short code and a link for the person to open and approve. After they approve, the first summary is sent automatically.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true } },
   { name: "scout_status", title: "Scout status",
-    description: "Show whether this computer is connected to Scout, when it last synced, and a summary of the work profile Scout has (top tools, languages, libraries, models).",
+    description: "Show whether this computer is connected, last sync, and the work profile including Claude Desktop (Cowork), Claude chat and ChatGPT app session counts plus tools, languages, libraries and models.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: true } },
   { name: "preview_scout_summary", title: "Preview what Scout receives",
@@ -64,6 +70,10 @@ const fmtList = (items, n = 8) => (items || []).slice(0, n).map(x => `${x.name} 
 const fmtObj = (o, n = 10) => Object.entries(o || {}).slice(0, n).map(([k, v]) => `${k} (${v})`).join(", ") || "none";
 
 async function callTool(name, args = {}) {
+  if (name === "link_phone") {
+    await linkPhone(args.code);
+    return "Phone approved. Keep the phone link page open; it finishes linking automatically.";
+  }
   if (name === "connect_scout") {
     const s = loadSettings();
     if (s.key) { const r = await sync(); return `This computer is already connected to Scout. ${r.status === "sent" ? `Sent ${r.sessions} new session summaries.` : "Everything is up to date."}`; }
@@ -80,6 +90,7 @@ async function callTool(name, args = {}) {
     const p = st.profile, t = p.top;
     return [`Connected to Scout. ${p.sessions} sessions from ${p.computers} computer(s) and ${p.projects} project(s). Last session: ${p.last_session || "none"}.`,
       `Automatic sync: ${st.auto_sync ? "on" : "off"}. Reading: ${st.sources.join(" and ")}.${st.exclude.length ? ` Leaving out: ${st.exclude.join(", ")}.` : ""}`,
+      `Apps (sessions): ${fmtObj(p.apps || {})}. Claude Desktop (Cowork): ${(p.apps?.["claude-cowork"] || 0) + (p.apps?.["claude-desktop"] || 0)}; Claude chat: ${p.apps?.["claude-chat"] || 0}; ChatGPT: ${p.apps?.chatgpt || 0}.`,
       `Full transcripts: ${st.transcripts ? `on${p.transcripts ? ` (${p.transcripts.n} stored)` : ""}` : "off (summaries only)"}.`,
       `Languages: ${fmtList(t.languages)}`, `Libraries: ${fmtList(t.libraries)}`, `Packages: ${fmtList(t.packages)}`,
       `Models: ${fmtList(t.models)}`, `Commands: ${fmtList(t.commands)}`].join("\n");

@@ -45,6 +45,12 @@ export function previewNow({ all = false } = {}) {
   return { ...preview(rows), files_scanned: filesScanned, skipped };
 }
 
+export async function linkPhone(code) {
+  const settings = loadSettings();
+  if (!settings.key) throw new Error("Connect this computer to Scout first.");
+  return call("/api/link/approve", { method: "POST", body: { code }, key: settings.key, settings });
+}
+
 // Collect what changed since last time and send it. Returns counts only.
 // With full transcripts turned on (opt-in), each of those sessions' whole log is also sent, credential-scrubbed and
 // gzipped; the first sync after opting in sends every session in the lookback window.
