@@ -12,6 +12,10 @@ Phase 1 verify-build review completed. Fixed concurrent rate-limit admission wit
 
 Added browser-compatible signal helper mirror, async SHA-256 chat readers, 400-row validated bundles and collector-equivalent preview. Synthetic fixtures cover Claude tools/errors/install fences, ChatGPT visible branch/model counts, and planted private data. Helper parity executes original collector helpers against identical inputs without editing collector/rules. Verify-build: connector tests 13/13, root tests 12/12, whitespace check pass. No real exports used. Next: worker-based phone import and iPhone screenshots.
 
+## Phone capture — Phase 3 (2026-11-11)
+
+Added mobile import page, local module worker, pinned fflate 0.8.3 streaming ZIP reader, generated browser module copies with byte-parity check, consent-gated batch sending, GSAP 3.12.5 progress/reveal, and optional count-only GTM event. POST /api/profile checks same-origin cookie linkage. Verify-build: root 12/12, connector 13/13, iPhone 15 WebKit 5/5 (both JSON formats, ZIP, invalid input, redirect, configured/unconfigured tracking), build/parity and Wrangler dry-run passed. Inspected both final preview screenshots at 375px; no horizontal overflow at 375/393px. Screenshots are ignored test artifacts. No deployment yet. Next: OAuth remote MCP; live model logging is model-reported, unlike deterministic on-device export parsing.
+
 Docs path: `/Users/jordaaan/a1-scout-docs`.
 Confirmed Scout path: `/Users/jordaaan/nvme-stash/a1-scout`.
 The requested `/Users/supabowl` does not exist; this uses the earlier confirmed `/Users/jordaaan` correction.

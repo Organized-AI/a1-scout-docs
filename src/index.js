@@ -68,6 +68,7 @@ export default {
     if (url.pathname === "/api/link/start" && req.method === "POST") return linkStart(req, env);
     if (url.pathname === "/api/link/approve" && req.method === "POST") return linkApprove(req, env);
     if (url.pathname === "/api/link/poll" && req.method === "POST") return linkPoll(req, env);
+    if (url.pathname === "/api/profile" && req.method === "POST") return profile(req, env);
     if (url.pathname === "/api/evidence" && req.method === "POST") return evidence(req, env);
     if (url.pathname === "/api/profile" && req.method === "GET") return profile(req, env);
     if (url.pathname === "/api/transcripts" && req.method === "PUT") return transcriptPut(req, env, url);

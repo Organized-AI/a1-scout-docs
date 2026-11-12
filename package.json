@@ -1,0 +1,16 @@
+{
+  "name": "a1-scout-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/browser-modules.mjs",
+    "test": "node --test test/*.test.mjs && npm --prefix connect test && node scripts/browser-modules.mjs --check",
+    "test:phone": "playwright test",
+    "dev": "npm run build && wrangler dev"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0",
+    "fflate": "0.8.3",
+    "wrangler": "4.160.1"
+  }
+}
