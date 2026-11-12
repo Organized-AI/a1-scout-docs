@@ -12,5 +12,8 @@
     "@playwright/test": "1.65.0",
     "fflate": "0.8.3",
     "wrangler": "4.160.1"
+  },
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "1.2.4"
   }
 }

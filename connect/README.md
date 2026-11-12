@@ -12,7 +12,19 @@ Reads Claude Code, Cowork and Codex session logs **on the user's computer** and 
 
 Then ask: "connect me to A1 Scout". The person opens the link, checks the code, clicks Connect. No tokens to copy.
 
-## Layout
+## Phone chats and remote MCP
+
+Link a phone browser at `/connect/link/`. Ask an already connected computer's Claude or Codex to “link my phone to A1 Scout, code XXXX-XXXX” (`link_phone`). The phone receives an HttpOnly device cookie, never a key in JSON. Then use `/connect/import/` to read an export locally. Exports cover **all chats on the account**, not only phone chats. Nothing is sent until you review the names-and-counts preview and press Send.
+
+For optional live summaries, add `https://scout.organizedai.vip/mcp` on **claude.ai web: Customize → Connectors → Add custom** (some layouts use Settings → Connectors → Add custom connector). Complete OAuth, link the browser if needed, check the client/redirect shown, and allow `scout:chat`. A connector configured on the web can be used from the Claude iPhone app under the same account; real-app verification is still pending for this release. Ask Claude to log this chat's names and counts using `scout_log_chat`; `scout_status` reads the summary. No background logging is promised.
+
+For ChatGPT, use the **web** app's Settings → Apps → Advanced settings → Developer mode, then add a custom MCP app with the same URL and OAuth. Availability depends on account/workspace permissions. **ChatGPT phone support: to verify**; do not assume the phone app can use it. Export import works independently of remote connector availability.
+
+Remote MCP calls run through the chat provider's infrastructure, not a device-local collector. Live logging is explicitly **model-reported** and opt-in; export parsing remains deterministic and on-device. Tools accept identifiers and counts, not transcripts, titles, URLs, paths or emails. Stable opaque chat references are hashed before storage. Reusing a reference updates its row. Remove the connector in the chat app to stop its use; access tokens expire after an hour and refresh grants after 30 days.
+
+Setup references: [Claude custom connectors](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp), [ChatGPT developer mode](https://help.openai.com/en/articles/12584461).
+
+## Connector files
 
 - `core/rules.mjs` bundle schema + privacy rules (shared with the Worker, runs in Node and Workers)
 - `core/collect.mjs` readers for Claude and Codex logs, signal extraction, bundles, cursor

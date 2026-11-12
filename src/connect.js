@@ -133,6 +133,11 @@ export async function evidence(req, env) {
   let bundle;
   try { bundle = validateBundle(await req.json()); }
   catch (e) { return json({ error: e instanceof BundleError ? e.message : "Send a JSON evidence bundle.", code: e.code }, 400); }
+  return storeEvidence(env, ws, bundle);
+}
+
+export async function storeEvidence(env, ws, input) {
+  const bundle = validateBundle(input);
   const t = now(), stmts = bundle.session_evidence.map(s => env.DB.prepare(
     `INSERT INTO evidence (workspace_id, source, digest, environment_id, project_fp, first_event, last_event, quality, event_count, observations, received_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -150,6 +155,10 @@ const STDLIB = new Set("os sys re json time datetime pathlib typing subprocess c
 export async function profile(req, env) {
   const ws = await deviceAuth(req, env);
   if (!ws) return json({ error: "This computer isn't connected." }, 401);
+  return workspaceProfile(env, ws);
+}
+
+export async function workspaceProfile(env, ws) {
   const { results } = await env.DB.prepare("SELECT source, environment_id, project_fp, last_event, observations FROM evidence WHERE workspace_id = ? ORDER BY last_event DESC LIMIT 5000").bind(ws).all();
   const add = (m, k, n = 1) => { if (k) m[k] = (m[k] || 0) + n; };
   const agg = { apps: {}, tools: {}, commands: {}, languages: {}, packages: {}, models: {}, imports: {} };

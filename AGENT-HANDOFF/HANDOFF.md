@@ -1,5 +1,9 @@
 # Step 0 handoff
 
+## Phone capture — Phase 4 (2026-11-11)
+
+Added stateless Streamable HTTP /mcp with OAuth PKCE, browser-bound single-use consent, workspace-scoped tokens, strict names/counts logging and profile status. Created OAUTH_KV and configured its binding; no production deployment yet. Documented Claude web/iPhone setup and ChatGPT web developer mode; real-app verification remains pending and ChatGPT phone support is explicitly to verify. Live summaries are model-reported, not a claim of device-local parsing. Verify-build: root 14/14, connector 13/13, iPhone WebKit 6/6 including real workerd OAuth token/replay flow, browser module parity and Wrangler dry-run pass. Consent and both import screenshots inspected. Isolated browser checks on port 8791 (no reuse) with local origin inference disabled, avoiding the separate private-dashboard thread's servers. Next: copy completed Cowork collector, version/package integration, remote migration and preview PR.
+
 ## Phone capture — Phase 0 / Phase 1 (2026-11-11)
 
 Goal B only, branch feat/phone-capture; git identity Jordan Hill. Baseline connector tests 9/9 and root tests 9/9 passed before edits. Supplied phone plan copied byte-for-byte and committed first (4789a44).
